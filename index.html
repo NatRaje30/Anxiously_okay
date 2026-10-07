@@ -97,6 +97,13 @@ canvas{display:block;touch-action:none}
 }
 @keyframes mascot-life{0%,100%{transform:scale(1) rotate(0deg)}25%{transform:scale(1.04) rotate(-1deg)}50%{transform:scale(1.08) rotate(0deg)}75%{transform:scale(1.04) rotate(1deg)}91%{transform:scale(1) rotate(-2deg)}95%{transform:scale(1) rotate(2deg)}}
 .cr-mascot{animation:mascot-life 6s ease-in-out infinite;display:inline-block}
+.cr-obj{background:none;border:none;padding:0;cursor:pointer;transition:transform .2s ease;-webkit-tap-highlight-color:transparent}
+.cr-obj:hover{filter:brightness(1.03)}
+.cr-obj:active{transform:scale(.95)!important}
+.cr-obj:focus-visible,#cr-companion:focus-visible{outline:2px dashed currentColor;outline-offset:4px}
+.cr-clamp{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.cr-room::-webkit-scrollbar{display:none}
+@media (prefers-reduced-motion:reduce){.cr-mascot,.aff-sway{animation:none!important}}
 @keyframes polshadow{0%,100%{box-shadow:3px 4px 12px rgba(0,0,0,.18)}50%{box-shadow:5px 6px 18px rgba(0,0,0,.25)}}
 </style>
 </head>
@@ -105,6 +112,11 @@ canvas{display:block;touch-action:none}
 <script>
 'use strict';
 var dark=false;
+/* iOS Safari has no working Web Notifications — detect up front and never call the API there.
+   The second clause catches iPadOS 13+, which reports itself as a Mac. */
+var isIOS=(/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+var IOS_NOTIF_MSG='On iPhone, add this app to your home screen to enable reminders.';
+function iosNotifNote(){return '<div style="display:flex;align-items:flex-start;gap:10px;background:var(--bg2);border:.5px solid var(--bdr);border-radius:12px;padding:12px 14px;text-align:left"><i class="ti ti-device-mobile-share" style="font-size:20px;color:var(--acc);flex-shrink:0;margin-top:1px"></i><div style="font-size:13px;color:var(--text);line-height:1.5">'+IOS_NOTIF_MSG+'<div style="font-size:11px;color:var(--t2);margin-top:4px">Tap the Share button in Safari, then <b>Add to Home Screen</b>.</div></div></div>';}
 var EM=['','🌪️','🌥️','⛅️','🌤️','🌞'];
 var MN=['','Stormy','Heavy','Steady','Lifted','Radiant'];
 var TRICKS=[
@@ -153,13 +165,18 @@ function mkS(){return{ob:false,obStep:0,obPath:'',name:'',dob:'',emergContact:{n
 var S=mkS(),bRAF=null,bPS=null,bPI=0,gLoop=null,ambRAF=null,ambObj={},recog=null;
 var ventCollapsed={};
 var ventSortByDay=false;
+var ventAddedMsg='',ventAddedTimer=null;
 var videoCache={};
 var voiceCache={};
-var voiceRecorder=null,voiceChunks=[],voiceRecording=false;
+var voiceRecorder=null,voiceChunks=[],voiceRecording=false,voiceTimer=null,voiceTick=null,voiceStart=0;
+var voiceMsg=null; /* {ok:bool,text:string} — banner on the Voices page */
+var VOICE_MAX_SEC=60,VOICE_MAX_UPLOAD=3*1024*1024,AO_STORE_LIMIT=4.8e6;
 var AO_PERSIST=['name','dob','ob','obPath','moodHist','streak','jlog','ventLog','wcsLog','unsentDrawer','tricks','customTricks','crSetup','crColor','crMascot','crMascotName','crPhotos','crAffirmations','crSongs','crNotes','crVoices','doodleGallery','emergContact','notifEnabled','notifTime','lastNotifDate','lastSupNotifDate'];
-function saveS(){try{var d={};AO_PERSIST.forEach(function(k){d[k]=S[k];});if(d.crPhotos)d.crPhotos=d.crPhotos.map(function(ph){var c=Object.assign({},ph);delete c.videoUrl;return c;});localStorage.setItem('ao_s',JSON.stringify(d));}catch(e){try{localStorage.removeItem('ao_s');var d2={};AO_PERSIST.forEach(function(k){d2[k]=S[k];});if(d2.crPhotos)d2.crPhotos=d2.crPhotos.map(function(ph){var c=Object.assign({},ph);delete c.videoUrl;return c;});localStorage.setItem('ao_s',JSON.stringify(d2));}catch(e2){}}}
+function aoSerialize(){var d={};AO_PERSIST.forEach(function(k){d[k]=S[k];});if(d.crPhotos)d.crPhotos=d.crPhotos.map(function(ph){var c=Object.assign({},ph);delete c.videoUrl;return c;});return JSON.stringify(d);}
+function saveS(){try{localStorage.setItem('ao_s',aoSerialize());}catch(e){try{localStorage.removeItem('ao_s');localStorage.setItem('ao_s',aoSerialize());}catch(e2){}}}
 function loadS(){try{var d=localStorage.getItem('ao_s');if(d){var p=JSON.parse(d);AO_PERSIST.forEach(function(k){if(p[k]!==undefined)S[k]=p[k];});if(S.crPhotos){var dirty=false;S.crPhotos.forEach(function(ph){if(ph.videoUrl){delete ph.videoUrl;dirty=true;}});if(dirty){try{localStorage.removeItem('ao_s');}catch(e){}saveS();}}}}catch(e){}}
 function Q(id){return document.getElementById(id);}
+function fmtVoiceSecs(n){return Math.floor(n/60)+':'+String(n%60).padStart(2,'0');}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function tdKey(){var n=new Date();return n.getFullYear()+'-'+(n.getMonth()+1)+'-'+n.getDate();}
 /* getMoodArr: normalises moodHist value to array; handles legacy single-number format */
@@ -400,7 +417,7 @@ function NAV(){
 function shell(top,body,showNav,game){
   var lockedOb=S.ob&&!S.name&&(S.obPath==='stressed'||S.obPath==='overwhelmed');
   if(lockedOb)showNav=false;
-  var setupBar=lockedOb?'<div style="position:absolute;bottom:0;left:0;right:0;background:var(--grn);padding:12px 18px;display:flex;align-items:center;gap:10px;z-index:20"><div style="font-size:12px;color:#fff;line-height:1.35;flex:1">Set up your profile to save your progress and unlock all features.</div><button id="ob-setup-bar" style="background:#fff;color:var(--grn);border:none;border-radius:20px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:\'DM Sans\',sans-serif;white-space:nowrap;flex-shrink:0">Set up →</button></div>':'';
+  var setupBar=lockedOb?'<div style="position:absolute;bottom:0;left:0;right:0;background:var(--grn);padding:12px 18px;display:flex;align-items:center;gap:10px;z-index:20"><div style="font-size:12px;color:#fff;line-height:1.35;flex:1">Want me to remember you? Add your name and I\'ll keep everything you do here.</div><button id="ob-setup-bar" style="background:#fff;color:var(--grn);border:none;border-radius:20px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:\'DM Sans\',sans-serif;white-space:nowrap;flex-shrink:0">Set up →</button></div>':'';
   var bc=game?'gb':'scroll anim-in';
   Q('sw').innerHTML='<div class="shell'+(dark?' dark':'')+'" id="msh"><div class="tb">'+top+'<button class="dm" id="dmb">'+(dark?'☀️':'🌙')+'</button></div><div class="'+bc+'" id="mb"'+(lockedOb?' style="padding-bottom:64px"':'')+'>'+body+'</div>'+(showNav?NAV():'')+setupBar+'</div>';
   Q('dmb').onclick=toggleDark;
@@ -432,13 +449,16 @@ function drawOb(){
       '<div style="font-size:44px;margin-bottom:16px">🔔</div>'+
       '<div class="serif" style="font-size:26px;font-style:italic;color:var(--text);text-align:center;line-height:1.25;margin-bottom:10px">Can I check in<br>on you?</div>'+
       '<div style="font-size:13px;color:var(--t2);text-align:center;margin-bottom:28px;line-height:1.6">I\'ll send a gentle nudge to log your mood each day — just one, at a time you choose. No spam, ever.</div>'+
-      '<div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;align-self:flex-start;width:100%">What time works best?</div>'+
-      '<input type="time" id="ob-notif-time" class="inp" value="'+(S.notifTime||'09:00')+'" style="margin-bottom:20px;width:100%;box-sizing:border-box;color-scheme:'+(dark?'dark':'light')+'">'+
-      '<button class="btn" id="ob-notif-yes">Remind me 🔔</button>'+
-      '<button id="ob-notif-skip" style="background:none;border:none;color:var(--t3);font-family:\'DM Sans\',sans-serif;font-size:13px;cursor:pointer;margin-top:12px;text-decoration:underline">Maybe later</button>'+
+      (isIOS?
+        '<div style="width:100%;margin-bottom:20px">'+iosNotifNote()+'</div>'+
+        '<button class="btn" id="ob-notif-skip">Got it</button>':
+        '<div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;align-self:flex-start;width:100%">What time works best?</div>'+
+        '<input type="time" id="ob-notif-time" class="inp" value="'+(S.notifTime||'09:00')+'" style="margin-bottom:20px;width:100%;box-sizing:border-box;color-scheme:'+(dark?'dark':'light')+'">'+
+        '<button class="btn" id="ob-notif-yes">Remind me 🔔</button>'+
+        '<button id="ob-notif-skip" style="background:none;border:none;color:var(--t3);font-family:\'DM Sans\',sans-serif;font-size:13px;cursor:pointer;margin-top:12px;text-decoration:underline">Maybe later</button>')+
     '</div></div>';
     function goFinal(){S.obStep=0;if(S.obPath==='overwhelmed'){S.scr='comfort';draw();}else{draw();}}
-    Q('ob-notif-yes').onclick=function(){
+    var onYes=Q('ob-notif-yes');if(onYes)onYes.onclick=function(){
       var t=Q('ob-notif-time');S.notifTime=(t?t.value:'')||'09:00';
       if(typeof Notification!=='undefined'){
         Notification.requestPermission().then(function(perm){S.notifEnabled=(perm==='granted');saveS();goFinal();});
@@ -453,7 +473,7 @@ function drawOb(){
       '<div class="serif" style="font-size:20px;font-style:italic;color:var(--text);text-align:center;margin-bottom:24px">what should I call you?</div>'+
       '<input class="inp" id="on" placeholder="Your name..." maxlength="40" style="margin-bottom:12px">'+
       '<input class="inp" id="od" type="date" placeholder="Date of birth" style="color-scheme:'+(dark?'dark':'light')+';margin-bottom:8px">'+
-      '<div style="font-size:11px;color:var(--t3);text-align:center;margin-bottom:20px">Used only to personalise your experience. Never shared.</div>'+
+      '<div style="font-size:11px;color:var(--t3);text-align:center;margin-bottom:20px">Just so I know what to call you. It stays on this device.</div>'+
       '<button class="btn" id="og" disabled>Let\'s begin →</button>'+
       '<button id="ob-skip" style="background:none;border:none;color:var(--t3);font-family:\'DM Sans\',sans-serif;font-size:13px;cursor:pointer;margin-top:12px;text-decoration:underline">Skip for now</button>'+
       '<button id="ob-back-btn" style="background:none;border:none;color:var(--t3);font-family:\'DM Sans\',sans-serif;font-size:12px;cursor:pointer;margin-top:6px">← Back</button>'+
@@ -461,7 +481,7 @@ function drawOb(){
     var n=Q('on'),d=Q('od'),g=Q('og');
     function ck(){g.disabled=!n.value.trim();}
     n.oninput=ck;d.oninput=ck;
-    function finishOb(nm,dv){S.name=nm;if(dv)S.dob=dv;S.ob=true;saveS();if(typeof Notification!=='undefined'&&Notification.permission!=='denied'){S.obStep=2;drawOb();}else{S.obStep=0;if(S.obPath==='overwhelmed'){S.scr='comfort';draw();}else{draw();}}}
+    function finishOb(nm,dv){S.name=nm;if(dv)S.dob=dv;S.ob=true;saveS();if(isIOS||(typeof Notification!=='undefined'&&Notification.permission!=='denied')){S.obStep=2;drawOb();}else{S.obStep=0;if(S.obPath==='overwhelmed'){S.scr='comfort';draw();}else{draw();}}}
     g.onclick=function(){var nv=n.value.trim(),dv=d.value;if(nv)finishOb(nv,dv);};
     Q('ob-skip').onclick=function(){finishOb('friend','');};
     var obbk=Q('ob-back-btn');if(obbk)obbk.onclick=function(){S.obStep=0;if(S.ob&&(S.obPath==='stressed'||S.obPath==='overwhelmed')){draw();}else{S.ob=false;drawOb();}};
@@ -470,7 +490,7 @@ function drawOb(){
 
 /* ── NOTIFICATIONS ── */
 function checkDailyNotif(){
-  if(!S.notifEnabled)return;
+  if(isIOS||!S.notifEnabled)return;
   if(typeof Notification==='undefined'||Notification.permission!=='granted')return;
   var now=new Date();
   var pad=function(n){return n<10?'0'+n:''+n;};
@@ -481,7 +501,7 @@ function checkDailyNotif(){
   /* Mood reminder */
   var todayArr=getMoodArr(todayStr),logged=todayArr&&todayArr.length>0;
   if(S.lastNotifDate!==todayStr&&!logged){
-    try{new Notification('Anxiously Okay',{body:'Hey '+(S.name||'there')+'! How are you feeling today? Take a moment to log your mood.',icon:'/favicon.ico'});}catch(e){}
+    try{new Notification('Anxiously Okay',{body:'Hey '+(S.name||'there')+'. How are you feeling today? No pressure — I\'m just checking in.',icon:'/favicon.ico'});}catch(e){}
     S.lastNotifDate=todayStr;saveS();
   }
   /* 3 tough days notification */
@@ -545,7 +565,7 @@ function drawMood(){
     return '<button class="mb'+(sel?' sel':'')+'" data-m="'+v+'"><span style="font-size:22px">'+EM[v]+'</span><span style="font-size:10px;color:'+(sel?'var(--gt)':'var(--t2)')+';font-weight:500;margin-top:1px">'+MN[v]+'</span>'+(sel?'<div style="position:absolute;bottom:4px;width:6px;height:6px;border-radius:50%;background:var(--grn)"></div>':'')+'</button>';
   }).join('');
   var ec=Object.keys(S.moodHist).length;
-  var logBtn='<button class="btn" id="ms"'+(dispM?'':' disabled')+'>'+(dispM?'Log '+MN[dispM]+' '+EM[dispM]:'Log today\'s mood')+'</button>';
+  var logBtn='<button class="btn" id="ms"'+(dispM?'':' disabled')+'>'+(dispM?'Log '+MN[dispM]+' '+EM[dispM]:'Tap whichever feels closest')+'</button>';
   var vbadge=S.ventLog.length?'<button id="vbdg" style="background:var(--sos);border:1px solid var(--sosbdr);border-radius:10px;padding:4px 9px;font-size:11px;font-weight:600;color:var(--sost);cursor:pointer;font-family:\'DM Sans\',sans-serif;display:flex;align-items:center;gap:4px;z-index:1;flex-shrink:0"><i class="ti ti-notebook" style="font-size:13px"></i>'+S.ventLog.length+'</button>':'';
   var moodObBack=(S.ob&&!S.name&&S.obPath==='overwhelmed')?'<button class="bk" id="mob-bk"><i class="ti ti-arrow-left" style="font-size:18px"></i>Back</button>':vbadge;
   shell(moodObBack+'<span class="tbt">mood</span>',
@@ -553,7 +573,7 @@ function drawMood(){
     '<div style="font-size:11px;color:var(--t3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">'+dStr()+'</div>'+
     '<div class="serif" style="font-size:22px;color:var(--text);margin-bottom:6px;line-height:1.3">'+greet()+', <em>'+S.name+'</em>.<br>How are you feeling?</div>'+
     '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:16px;line-height:1.5">Some days are heavy. Some days are light. Log it as it is — no day has to make sense.</div>'+
-    '<div style="display:flex;gap:8px;margin-bottom:18px"><div class="stat"><div class="serif" style="font-size:22px;color:var(--text)">'+S.streak+'</div><div style="font-size:10px;color:var(--t2);margin-top:2px">day streak</div></div><div class="stat"><div class="serif" style="font-size:22px;color:var(--text)">'+ec+'</div><div style="font-size:10px;color:var(--t2);margin-top:2px">entries</div></div></div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:18px"><div class="stat"><div class="serif" style="font-size:22px;color:var(--text)">'+S.streak+'</div><div style="font-size:10px;color:var(--t2);margin-top:2px">days in a row</div></div><div class="stat"><div class="serif" style="font-size:22px;color:var(--text)">'+ec+'</div><div style="font-size:10px;color:var(--t2);margin-top:2px">days checked in</div></div></div>'+
     '<div style="display:flex;gap:5px;margin-bottom:16px">'+btns+'</div>'+
     logBtn+
     (todayArr.length>1?'<div style="font-size:11px;color:var(--t2);text-align:center;margin:6px 0 -4px;font-family:\'DM Sans\',sans-serif">'+todayArr.length+' moods logged today: '+todayArr.map(function(e){return EM[e.mood];}).join(' ')+'</div>':'')+
@@ -561,10 +581,10 @@ function drawMood(){
     '<div style="background:var(--sos);border:2px solid var(--sosbdr);border-radius:16px;padding:20px 16px 16px;margin:4px 0 18px;box-shadow:0 3px 14px rgba(0,0,0,.07)">'+
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><div style="font-size:14px;font-weight:600;color:var(--sosh)">Vent <span id="dump-icon">🗑</span></div></div>'+
     '<div class="serif" style="font-size:13px;font-style:italic;color:var(--sost);margin-bottom:10px">Get it out. Save it privately, or let it go forever.</div>'+
-    (S.ventEditIdx!==-1?'<div style="background:var(--gbg);border:1.5px solid var(--gbdr);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--gt)">Editing a saved entry — update or release below.</div>':'')+
-    (S.ventSaved?'<div class="bnr"><i class="ti ti-mail" style="font-size:18px;color:var(--grn)"></i>Saved.</div>':'')+
-    (S.ventDone?'<div class="bnr"><i class="ti ti-sparkles" style="font-size:18px;color:var(--grn)"></i>Released. Well done for letting that go.</div>':'')+
-    '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px"><textarea class="ta" id="dt" rows="3" placeholder="Type anything... vent freely." style="flex:1">'+(S.ventDone||S.ventSaved?'':S.dump)+'</textarea><button class="mic" id="mic"><i class="ti '+(S.micOn?'ti-microphone-off':'ti-microphone')+'" style="font-size:18px;color:'+(S.micOn?'#fff':'var(--sost)')+'"></i></button></div>'+
+    (S.ventEditIdx!==-1?'<div style="background:var(--gbg);border:1.5px solid var(--gbdr);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--gt)">You\'re changing something you wrote earlier. Keep it, or let it go.</div>':'')+
+    (S.ventSaved?'<div class="bnr"><i class="ti ti-mail" style="font-size:18px;color:var(--grn)"></i>Tucked away safely. It\'s yours.</div>':'')+
+    (S.ventDone?'<div class="bnr"><i class="ti ti-sparkles" style="font-size:18px;color:var(--grn)"></i>Gone. You don\'t have to carry that one anymore.</div>':'')+
+    '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px"><textarea class="ta" id="dt" rows="3" placeholder="Say it exactly how it is. No one else will read this." style="flex:1">'+(S.ventDone||S.ventSaved?'':S.dump)+'</textarea><button class="mic" id="mic"><i class="ti '+(S.micOn?'ti-microphone-off':'ti-microphone')+'" style="font-size:18px;color:'+(S.micOn?'#fff':'var(--sost)')+'"></i></button></div>'+
     (S.micOn?'<div style="font-size:12px;color:var(--acc);margin-bottom:8px;animation:pulse 1s infinite">● Listening...</div>':'')+
     '<div style="display:flex;gap:8px">'+
       '<button id="vs" style="flex:1;padding:11px;background:var(--gbg);color:var(--gt);border:1.5px solid var(--gbdr);border-radius:12px;font-family:\'DM Sans\',sans-serif;font-size:14px;font-weight:500;cursor:pointer">'+(S.ventEditIdx!==-1?'Update 📬':'Save 📬')+'</button>'+
@@ -648,21 +668,22 @@ function drawVentHistory(){
     byMonth[key].push({v:v,i:i});
   });
   var body='<div class="serif" style="font-size:21px;color:var(--text);margin-top:4px;margin-bottom:3px">Past <em>Vents</em></div>'+
-    '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:10px;line-height:1.5">Everything you\'ve released.</div>'+
+    '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:10px;line-height:1.5">The things you wrote down and kept. Only you can see them.</div>'+
     '<div style="display:flex;gap:8px;margin-bottom:14px">'+
       '<button id="vsort-month" style="padding:5px 14px;border-radius:16px;font-size:12px;font-family:\'DM Sans\',sans-serif;cursor:pointer;font-weight:500;border:1.5px solid '+(ventSortByDay?'var(--bdr)':'var(--grn)')+';background:'+(ventSortByDay?'var(--bg2)':'var(--gbg)')+';color:'+(ventSortByDay?'var(--t2)':'var(--gt)')+'">By month</button>'+
       '<button id="vsort-day" style="padding:5px 14px;border-radius:16px;font-size:12px;font-family:\'DM Sans\',sans-serif;cursor:pointer;font-weight:500;border:1.5px solid '+(ventSortByDay?'var(--grn)':'var(--bdr)')+';background:'+(ventSortByDay?'var(--gbg)':'var(--bg2)')+';color:'+(ventSortByDay?'var(--gt)':'var(--t2)')+'">By day</button>'+
     '</div>';
+  if(ventAddedMsg)body+='<div class="bnr"><i class="ti ti-circle-check" style="font-size:18px;color:var(--grn)"></i>'+esc(ventAddedMsg)+'</div>';
   if(S.ventHistDate!==undefined){
-    body+='<div style="background:var(--gbg);border:1.5px solid var(--gbdr);border-radius:10px;padding:10px 12px;margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:var(--gt);margin-bottom:6px">ADD FOR A PAST DATE</div>'+
+    body+='<div style="background:var(--gbg);border:1.5px solid var(--gbdr);border-radius:10px;padding:10px 12px;margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:var(--gt);margin-bottom:6px">AN EARLIER DAY</div>'+
       '<input type="date" id="vh-date" max="'+crTodayStr()+'" value="'+(S.ventHistDate||'')+'" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--gbdr);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;margin-bottom:6px">'+
-      '<textarea id="vh-ta" rows="3" placeholder="What\'s on your mind?" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--gbdr);border-radius:8px;font-size:14px;background:var(--bg);color:var(--text);resize:none;font-family:\'DM Sans\',sans-serif;margin-bottom:6px"></textarea>'+
-      '<div style="display:flex;gap:8px"><button id="vh-save" style="flex:1;padding:9px;background:var(--gbg);color:var(--gt);border:1.5px solid var(--gbdr);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif">Save</button>'+
+      '<textarea id="vh-ta" rows="3" placeholder="What happened that day?" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--gbdr);border-radius:8px;font-size:14px;background:var(--bg);color:var(--text);resize:none;font-family:\'DM Sans\',sans-serif;margin-bottom:6px"></textarea>'+
+      '<div style="display:flex;gap:8px"><button id="vh-save" style="flex:1;padding:9px;background:var(--gbg);color:var(--gt);border:1.5px solid var(--gbdr);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif">Keep it</button>'+
       '<button id="vh-cancel" style="padding:9px 14px;background:var(--bg2);color:var(--t2);border:.5px solid var(--bdr);border-radius:10px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Cancel</button></div></div>';
   }
-  body+='<button id="vh-addpast" style="display:block;width:100%;padding:9px;background:var(--bg2);color:var(--acc);border:.5px solid var(--bdr);border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif;margin-bottom:14px">+ Add vent for a past date</button>';
+  body+='<button id="vh-addpast" style="display:block;width:100%;padding:9px;background:var(--bg2);color:var(--acc);border:.5px solid var(--bdr);border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif;margin-bottom:14px">+ Write about an earlier day</button>';
   if(S.ventLog.length===0){
-    body+='<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);text-align:center;padding:30px 0">No vents yet. It\'s okay to start.</div>';
+    body+='<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);text-align:center;padding:30px 0">Nothing here yet. Whenever something feels heavy, you can set it down here.</div>';
   } else if(ventSortByDay){
     S.ventLog.forEach(function(v,i){
       body+='<div class="jent"><div style="font-size:11px;color:var(--t3);margin-bottom:4px">'+esc(v.date||v.isoDate||'')+'</div>'+
@@ -704,6 +725,11 @@ function drawVentHistory(){
     var d=new Date(iso+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
     S.ventLog.push({text:txt,date:d,isoDate:iso});
     S.ventLog.sort(function(a,b){var da=a.isoDate||'0',db=b.isoDate||'0';return da>db?-1:da<db?1:0;});
+    var dObj=new Date(iso+'T00:00:00');
+    var nice=dObj.toLocaleDateString('en-US',dObj.getFullYear()===new Date().getFullYear()?{weekday:'long',month:'long',day:'numeric'}:{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+    ventAddedMsg='Added for '+nice+'.';
+    if(ventAddedTimer)clearTimeout(ventAddedTimer);
+    ventAddedTimer=setTimeout(function(){ventAddedMsg='';ventAddedTimer=null;if(S.scr==='venthistory')drawVentHistory();},3000);
     S.ventHistDate=undefined;saveS();drawVentHistory();
   };
   document.querySelectorAll('[data-vhmonth]').forEach(function(el){el.onclick=function(){var k=el.dataset.vhmonth;ventCollapsed[k]=!ventCollapsed[k];drawVentHistory();};});
@@ -790,8 +816,8 @@ function drawSupport(){
 function drawWCS(){
   var body='<div class="serif" style="font-size:21px;color:var(--text);margin-top:4px;margin-bottom:3px">Worst Case <em>Scenario</em></div>';
   body+='<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:14px;line-height:1.5">Write down the worst that could happen. Sometimes seeing it on paper takes some of its power away.</div>';
-  if(S.wcsEditIdx!==-1) body+='<div style="background:var(--gbg);border:1.5px solid var(--gbdr);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--gt)">Editing a saved entry — update or release below.</div>';
-  if(S.wcsSaved) body+='<div class="bnr"><i class="ti ti-mail" style="font-size:18px;color:var(--grn)"></i>Saved.</div>';
+  if(S.wcsEditIdx!==-1) body+='<div style="background:var(--gbg);border:1.5px solid var(--gbdr);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--gt)">You\'re changing something you wrote earlier. Keep it, or let it go.</div>';
+  if(S.wcsSaved) body+='<div class="bnr"><i class="ti ti-mail" style="font-size:18px;color:var(--grn)"></i>Tucked away safely. It\'s yours.</div>';
   body+='<textarea class="ta" id="dt" rows="4" placeholder="What\'s the absolute worst that happens…?" style="margin-bottom:10px">'+S.wcsDraft+'</textarea>';
   body+='<div style="display:flex;gap:8px;margin-bottom:16px">'+
     '<button id="wcs-save" style="flex:1;padding:11px;background:var(--gbg);color:var(--gt);border:1.5px solid var(--gbdr);border-radius:12px;font-family:\'DM Sans\',sans-serif;font-size:14px;font-weight:500;cursor:pointer">'+(S.wcsEditIdx!==-1?'Update 📬':'Save 📬')+'</button>'+
@@ -800,7 +826,7 @@ function drawWCS(){
   '</div>';
   if(S.wcsLog.length>0){
     body+='<div style="border-top:.5px solid var(--bdr);margin-bottom:12px"></div>';
-    body+='<div style="font-size:11px;color:var(--t2);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">saved scenarios</div>';
+    body+='<div style="font-size:11px;color:var(--t2);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">the ones you kept</div>';
     body+=S.wcsLog.slice(0,5).map(function(e,i){
       return '<div class="jent"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px"><div style="font-size:11px;color:var(--t3)">'+e.date+'</div></div><div style="font-size:13px;color:var(--text);line-height:1.5">'+e.text.slice(0,100)+(e.text.length>100?'…':'')+'</div><div style="display:flex;gap:10px;margin-top:6px"><button data-wcsedit="'+i+'" style="font-size:12px;color:var(--grn);background:none;border:none;cursor:pointer;font-family:\'DM Sans\',sans-serif;font-weight:500">Edit</button><button data-wcsdel="'+i+'" style="font-size:12px;color:var(--t3);background:none;border:none;cursor:pointer;font-family:\'DM Sans\',sans-serif">× Delete</button></div></div>';
     }).join('');
@@ -868,7 +894,7 @@ function drawWins(){
 function drawMe(){
   var a=calcAge(S.dob);
   var delSec=S.confirmDelete?
-    '<div style="background:var(--sos);border-radius:12px;padding:14px;margin-bottom:14px;border:.5px solid var(--sosbdr)"><div style="font-size:13px;color:var(--sosh);font-weight:500;margin-bottom:5px">Delete account?</div><div style="font-size:12px;color:var(--sost);margin-bottom:12px;line-height:1.5">All your data will be permanently removed.</div><div style="display:flex;gap:8px"><button class="btng" id="del-no">Cancel</button><button id="del-yes" style="flex:1;padding:12px;background:var(--acc);color:#fff;border:none;border-radius:12px;font-family:\'DM Sans\',sans-serif;font-size:14px;font-weight:500;cursor:pointer">Yes, delete</button></div></div>':
+    '<div style="background:var(--sos);border-radius:12px;padding:14px;margin-bottom:14px;border:.5px solid var(--sosbdr)"><div style="font-size:13px;color:var(--sosh);font-weight:500;margin-bottom:5px">Delete account?</div><div style="font-size:12px;color:var(--sost);margin-bottom:12px;line-height:1.5">Everything you\'ve written and saved here will be gone for good. This can\'t be undone.</div><div style="display:flex;gap:8px"><button class="btng" id="del-no">Cancel</button><button id="del-yes" style="flex:1;padding:12px;background:var(--acc);color:#fff;border:none;border-radius:12px;font-family:\'DM Sans\',sans-serif;font-size:14px;font-weight:500;cursor:pointer">Yes, delete</button></div></div>':
     '<button id="del-btn" style="width:100%;padding:13px;background:var(--bg);color:var(--t2);border:.5px solid var(--bdr);border-radius:12px;font-family:\'DM Sans\',sans-serif;font-size:14px;cursor:pointer;margin-bottom:14px">Delete account</button>';
   shell('<button class="bk" id="meb"><i class="ti ti-arrow-left" style="font-size:18px"></i>Back</button><span class="tbt">me</span>',
     '<div style="text-align:center;padding:20px 0 16px"><div style="width:68px;height:68px;border-radius:50%;background:var(--gbg);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 10px">🌿</div><div class="serif" style="font-size:22px;color:var(--text)">'+S.name+'</div>'+(a!==null?'<div style="font-size:13px;color:var(--t2);margin-top:3px">'+a+' years old</div>':'')+'</div>'+
@@ -877,11 +903,12 @@ function drawMe(){
       '<div style="margin-bottom:.9rem"><div style="font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Name</div><input class="inp" id="pen" value="'+S.pName+'"></div><div style="margin-bottom:18px"><div style="font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Date of Birth</div><input class="inp" id="ped" type="date" value="'+S.pDob+'" style="color-scheme:'+(dark?'dark':'light')+'"></div><div style="display:flex;gap:10px;margin-bottom:16px"><button class="btng" id="pec">Cancel</button><button class="btn" id="pes">Save</button></div>')+
     '<button id="plo" style="width:100%;padding:13px;background:var(--bg);color:var(--acc);border:1.5px solid var(--sosbdr);border-radius:12px;font-family:\'DM Sans\',sans-serif;font-size:15px;font-weight:500;cursor:pointer;margin-bottom:10px">Log out</button>'+
     delSec+
-    '<div style="background:var(--bg2);border-radius:12px;padding:14px;border:.5px solid var(--bdr);margin-bottom:10px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">🔔</span><div style="font-size:13px;font-weight:600;color:var(--text)">Daily check-in</div></div><button id="notif-toggle" style="width:44px;height:24px;border-radius:12px;border:none;cursor:pointer;background:'+(S.notifEnabled?'var(--grn)':'var(--bdr)')+';position:relative;flex-shrink:0;transition:background .2s"><span style="position:absolute;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s;left:'+(S.notifEnabled?'23px':'3px')+'"></span></button></div>'+
-    '<div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:'+(S.notifEnabled?'12px':'0')+'">A gentle nudge to log your mood if you haven\'t yet. Only one notification per day.</div>'+
-    (S.notifEnabled?'<div style="display:flex;align-items:center;gap:10px"><div style="font-size:12px;color:var(--t2);flex:1">Reminder time</div><input type="time" id="notif-time-input" value="'+(S.notifTime||'09:00')+'" style="background:var(--bg);border:.5px solid var(--bdr);border-radius:8px;padding:5px 8px;font-family:\'DM Sans\',sans-serif;font-size:13px;color:var(--text);color-scheme:'+(dark?'dark':'light')+'"><button id="notif-save" style="background:var(--grn);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif">Save</button></div>':'')+
+    '<div style="background:var(--bg2);border-radius:12px;padding:14px;border:.5px solid var(--bdr);margin-bottom:10px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">🔔</span><div style="font-size:13px;font-weight:600;color:var(--text)">Daily check-in</div></div>'+(isIOS?'':'<button id="notif-toggle" style="width:44px;height:24px;border-radius:12px;border:none;cursor:pointer;background:'+(S.notifEnabled?'var(--grn)':'var(--bdr)')+';position:relative;flex-shrink:0;transition:background .2s"><span style="position:absolute;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s;left:'+(S.notifEnabled?'23px':'3px')+'"></span></button>')+'</div>'+
+    (isIOS?iosNotifNote():
+    '<div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:'+(S.notifEnabled?'12px':'0')+'">If you haven\'t checked in by this time, I\'ll send one gentle nudge. Just one a day.</div>')+
+    (S.notifEnabled&&!isIOS?'<div style="display:flex;align-items:center;gap:10px"><div style="font-size:12px;color:var(--t2);flex:1">Reminder time</div><input type="time" id="notif-time-input" value="'+(S.notifTime||'09:00')+'" style="background:var(--bg);border:.5px solid var(--bdr);border-radius:8px;padding:5px 8px;font-family:\'DM Sans\',sans-serif;font-size:13px;color:var(--text);color-scheme:'+(dark?'dark':'light')+'"><button id="notif-save" style="background:var(--grn);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif">Save</button></div>':'')+
     '</div>'+
-    '<div style="background:var(--bg2);border-radius:12px;padding:13px;border:.5px solid var(--bdr)"><div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:4px">About Anxiously Okay</div><div style="font-size:12px;color:var(--t2);line-height:1.6">A supportive companion, not a replacement for professional mental health care.</div></div>',true);
+    '<div style="background:var(--bg2);border-radius:12px;padding:13px;border:.5px solid var(--bdr)"><div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:4px">About Anxiously Okay</div><div style="font-size:12px;color:var(--t2);line-height:1.6">I\'m here for the in-between moments. I\'m not a replacement for a therapist or doctor — if things feel like too much, please reach out to one.</div></div>',true);
   Q('meb').onclick=function(){go('mood');};
   Q('plo').onclick=logout;
   var dBtn=Q('del-btn');if(dBtn)dBtn.onclick=function(){S.confirmDelete=true;drawMe();};
@@ -955,9 +982,9 @@ function initDoodle(){
 }
 function drawDoodleGallery(){
   var body='<div class="serif" style="font-size:21px;color:var(--text);margin-top:4px;margin-bottom:3px">Doodle <em>Gallery</em></div>'+
-    '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:14px;line-height:1.5">Your saved drawings.</div>';
+    '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:14px;line-height:1.5">Everything you\'ve drawn and kept.</div>';
   if(!S.doodleGallery||S.doodleGallery.length===0){
-    body+='<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);text-align:center;padding:40px 0">No saved doodles yet. Draw something and tap Save.</div>';
+    body+='<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);text-align:center;padding:40px 0">Nothing here yet. Draw anything, even a scribble, and tap Save to keep it.</div>';
   } else {
     body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
     S.doodleGallery.forEach(function(d,i){
@@ -1399,18 +1426,18 @@ function drawMyCorner(){
       '<div style="display:flex;flex-direction:column;gap:10px">'+
         '<button data-mctab="comfort" style="width:100%;padding:16px;background:var(--bg2);border:.5px solid var(--bdr);border-radius:18px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:14px">'+
           '<span style="font-size:30px;flex-shrink:0">🏡</span>'+
-          '<div><div style="font-size:15px;font-weight:600;color:var(--text);font-family:\'DM Sans\',sans-serif;margin-bottom:3px">Comfort Room</div>'+
-          '<div class="serif" style="font-size:12px;font-style:italic;color:var(--t2);line-height:1.4">Photos, songs, words, and memories that make you feel like yourself.</div></div>'+
+          '<div><div style="font-size:15px;font-weight:600;color:var(--text);font-family:\'DM Sans\',sans-serif">Comfort Room</div>'+
+          '</div>'+
         '</button>'+
         '<button data-mctab="wins" style="width:100%;padding:16px;background:var(--bg2);border:.5px solid var(--bdr);border-radius:18px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:14px">'+
           '<span style="font-size:30px;flex-shrink:0">🌟</span>'+
-          '<div><div style="font-size:15px;font-weight:600;color:var(--text);font-family:\'DM Sans\',sans-serif;margin-bottom:3px">Wins</div>'+
-          '<div class="serif" style="font-size:12px;font-style:italic;color:var(--t2);line-height:1.4">Write it down. It counts.</div></div>'+
+          '<div><div style="font-size:15px;font-weight:600;color:var(--text);font-family:\'DM Sans\',sans-serif">Wins</div>'+
+          '</div>'+
         '</button>'+
         '<button data-mctab="unsent" style="width:100%;padding:16px;background:var(--bg2);border:.5px solid var(--bdr);border-radius:18px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:14px">'+
           '<span style="font-size:30px;flex-shrink:0">✉️</span>'+
-          '<div><div style="font-size:15px;font-weight:600;color:var(--text);font-family:\'DM Sans\',sans-serif;margin-bottom:3px">Letters I\'ll Never Send</div>'+
-          '<div class="serif" style="font-size:12px;font-style:italic;color:var(--t2);line-height:1.4">For the things you need to say but can\'t.</div></div>'+
+          '<div><div style="font-size:15px;font-weight:600;color:var(--text);font-family:\'DM Sans\',sans-serif">Letters I\'ll Never Send</div>'+
+          '</div>'+
         '</button>'+
       '</div>',
       true);
@@ -1447,7 +1474,7 @@ function drawMyCornerWins(){
     }).join('')+
     '<button class="btn" id="wsave" style="margin-bottom:8px">Save my wins 🌟</button>'+
     (S.jlog&&S.jlog.length?
-      '<div style="font-size:11px;color:var(--t2);font-weight:500;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 10px">past wins</div>'+
+      '<div style="font-size:11px;color:var(--t2);font-weight:500;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 10px">wins you\'ve already had</div>'+
       S.jlog.slice(0,10).map(function(e,i){
         var isEdit=S.winEditIdx===i;
         return '<div class="jent"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px"><div style="font-size:11px;color:var(--t3)">'+esc(e.date)+'</div>'+
@@ -1558,7 +1585,7 @@ function drawComfortSetup(){
   }).join('');
   shell('<button class="bk" id="crbk"><i class="ti ti-arrow-left" style="font-size:18px"></i>Back</button><span class="tbt">comfort room</span>',
     '<div class="serif" style="font-size:21px;color:var(--text);margin-top:4px;margin-bottom:3px">Set up your <em>Comfort Room</em></div>'+
-    '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:18px;line-height:1.5">Choose a colour and a companion for your private space.</div>'+
+    '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:18px;line-height:1.5">Pick a colour for the walls and someone to keep you company.</div>'+
     '<div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Room colour</div>'+
     '<div style="display:flex;gap:6px;margin-bottom:18px">'+colorSwatches+'</div>'+
     '<div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Your companion</div>'+
@@ -1566,7 +1593,7 @@ function drawComfortSetup(){
     (S.crMascot?
       '<div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Name your '+CR_MASCOTS.find(function(m){return m.id===S.crMascot;}).name.toLowerCase()+'</div>'+
       '<input class="inp" id="cr-name" placeholder="What shall we call them?" maxlength="20" value="'+esc(S.crMascotName)+'">'+
-      '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;margin-top:4px">Max 20 characters. You can change this later.</div>'
+      '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;margin-top:4px">Up to 20 letters. You can change it anytime.</div>'
     :'')+
     '<button class="btn" id="cr-enter"'+(S.crMascot&&S.crMascotName.trim()?'':' disabled')+'>Enter your room →</button>',
     true);
@@ -1602,14 +1629,18 @@ function drawComfortScrapbook(){
 
   function affCard(a,i){
     var rots=[-3,-1,2,-2,1,-3,2,-1,3];var rot=rots[i%rots.length];
-    var bg=dark?(i%3===0?'rgba(80,60,8,.6)':i%3===1?'rgba(80,20,20,.6)':'rgba(10,60,20,.6)'):(i%3===0?'#fefce4':i%3===1?'#fef0f0':'#f0fef4');
+    /* Dark mode: warm "candlelit paper" — honey, rose-clay, olive — lifted with a soft top-left glow */
+    var bg=dark?
+      'linear-gradient(160deg,rgba(255,224,160,.14),rgba(255,224,160,0) 60%),'+(i%3===0?'rgba(92,68,26,.92)':i%3===1?'rgba(94,56,42,.92)':'rgba(70,72,36,.92)'):
+      (i%3===0?'#fefce4':i%3===1?'#fef0f0':'#f0fef4');
+    var affTxt=dark?'#f6e6c6':p.txt;
     var delay=(i*1.3)%6;
-    return '<div class="aff-sway" style="--aff-rot:'+rot+'deg;position:relative;background:'+bg+';border-radius:3px;padding:14px 14px 24px;box-shadow:1px 2px 8px rgba(0,0,0,'+(dark?'.4':'.1')+');animation-delay:'+delay+'s;margin-bottom:14px">'+
+    return '<div class="aff-sway" style="--aff-rot:'+rot+'deg;position:relative;background:'+bg+';border-radius:3px;padding:14px 14px 24px;box-shadow:'+(dark?'0 0 0 1px rgba(255,214,150,.10),0 0 18px rgba(240,170,70,.10),1px 3px 10px rgba(0,0,0,.35)':'1px 2px 8px rgba(0,0,0,.1)')+';animation-delay:'+delay+'s;margin-bottom:14px">'+
       '<div style="position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;background:#c0a0a0;box-shadow:0 1px 3px rgba(0,0,0,.25)"></div>'+
-      '<div class="serif" style="font-size:14px;font-style:italic;color:'+p.txt+';line-height:1.7">'+esc(a.text)+'</div>'+
+      '<div class="serif" style="font-size:14px;font-style:italic;color:'+affTxt+';line-height:1.7">'+esc(a.text)+'</div>'+
       '<div style="display:flex;gap:8px;position:absolute;bottom:4px;right:6px">'+
-      '<button data-affedit="'+i+'" style="background:none;border:none;cursor:pointer;color:var(--acc);font-size:11px;padding:2px 4px;font-family:\'DM Sans\',sans-serif">Edit</button>'+
-      '<button data-affdel="'+i+'" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:11px;padding:2px 4px;font-family:\'DM Sans\',sans-serif">&#215;</button></div>'+
+      '<button data-affedit="'+i+'" style="background:none;border:none;cursor:pointer;color:'+(dark?'#f0b070':'var(--acc)')+';font-size:11px;padding:2px 4px;font-family:\'DM Sans\',sans-serif">Edit</button>'+
+      '<button data-affdel="'+i+'" style="background:none;border:none;cursor:pointer;color:'+(dark?'rgba(246,230,198,.55)':'var(--t3)')+';font-size:11px;padding:2px 4px;font-family:\'DM Sans\',sans-serif">&#215;</button></div>'+
     '</div>';
   }
 
@@ -1653,47 +1684,72 @@ function drawComfortScrapbook(){
 
   /* ── COVER PAGE ── */
   if(S.crSection===null||S.crSection===undefined){
-    var ph=S.crPhotos.length,af=S.crAffirmations.length,sg=S.crSongs.length,nt=S.crNotes.length;
+    /* The cover is a room, not a menu: companion under a lamp at the top, a polaroid and a pinned
+       note on the wall (previewing real content), and three objects on a shelf. */
+    var firstPhoto=S.crPhotos.find(function(x){return x.url;});
+    var firstAff=S.crAffirmations[0];
+    var hr=new Date().getHours();
+    var hello=hr<5?'Can\'t sleep? Stay a while.':hr<12?'Morning. Make yourself at home.':hr<17?'Come in. Take a breath.':'Welcome back. Stay as long as you like.';
+    var wallTop=dark?'radial-gradient(130% 55% at 50% 0%,'+p.glow.replace(/[\d.]+\)$/,'.32)')+',transparent 70%)':'radial-gradient(130% 55% at 50% 0%,rgba(255,250,235,.9),transparent 70%),linear-gradient(180deg,'+p.wall+'66 0%,'+p.bg+' 72%)';
+    var noteBg=dark?'linear-gradient(160deg,rgba(255,224,160,.14),rgba(255,224,160,0) 60%),rgba(92,68,26,.92)':'#fefce4';
+    var noteTxt=dark?'#f6e6c6':p.txt;
+    var lbl='font-family:\'Caveat\',cursive;font-size:18px;line-height:1;color:'+p.txt+';display:block;margin-top:6px';
 
-    function secCard(icon,label,count,unit,secIdx,hint){
-      var preview='';
-      if(secIdx===0&&S.crPhotos.length>0){
-        preview='<div style="display:flex;gap:4px;margin-top:8px;overflow:hidden">'+S.crPhotos.slice(0,3).map(function(ph2){return '<img src="'+ph2.url+'" style="width:36px;height:36px;object-fit:cover;border-radius:4px;flex-shrink:0">';}).join('')+'</div>';
-      } else if(secIdx===1&&S.crAffirmations.length>0){
-        preview='<div style="font-size:11px;font-style:italic;color:'+p.txt+';opacity:.7;margin-top:6px;line-height:1.4;overflow:hidden;max-height:28px">'+esc(S.crAffirmations[0].text)+'</div>';
-      } else if(secIdx===2&&S.crSongs.length>0){
-        preview='<div style="font-size:11px;color:'+p.txt+';opacity:.7;margin-top:6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+esc(S.crSongs[0].name)+'</div>';
-      } else if(secIdx===3&&S.crNotes.length>0){
-        preview='<div style="font-size:11px;color:'+p.txt+';opacity:.7;margin-top:6px">'+nt+' envelope'+(nt!==1?'s':'')+'</div>';
-      } else {
-        preview='<div style="font-size:11px;color:'+p.txt+';opacity:.45;margin-top:6px;font-style:italic">'+hint+'</div>';
-      }
-      return '<button data-crsec="'+secIdx+'" style="background:'+p.card+';border:1px solid '+p.bdr+';border-radius:18px;padding:14px 12px 12px;text-align:left;cursor:pointer;width:100%;display:block">'+
-        '<div style="font-size:26px;margin-bottom:4px">'+icon+'</div>'+
-        '<div style="font-size:13px;font-weight:600;color:'+p.txt+';font-family:\'DM Sans\',sans-serif">'+label+'</div>'+
-        '<div style="font-size:11px;color:'+p.txt+';opacity:.6;margin-top:1px">'+count+' '+unit+'</div>'+
-        preview+
+    var polaroidObj='<button class="cr-obj" data-crsec="0" aria-label="Memories" style="transform:rotate(-4deg)">'+
+      '<div style="position:relative;background:'+(dark?'#f2eadb':'#fff')+';padding:7px 7px 24px;box-shadow:2px 4px 12px rgba(0,0,0,'+(dark?'.5':'.18')+');border-radius:2px">'+
+        '<div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%) rotate(3deg);width:44px;height:15px;background:'+p.wall+';opacity:.75"></div>'+
+        (firstPhoto?'<img src="'+firstPhoto.url+'" alt="" style="width:96px;height:96px;object-fit:cover;display:block">':
+          '<div style="width:96px;height:96px;border:1.5px dashed #c8b8a0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#8a7458"><span style="font-size:26px">&#128248;</span><span style="font-family:\'Caveat\',cursive;font-size:15px">add a photo</span></div>')+
+        '<span style="position:absolute;left:0;right:0;bottom:3px;text-align:center;font-family:\'Caveat\',cursive;font-size:17px;color:#4a3a28">Memories</span>'+
+      '</div></button>';
+
+    var noteObj='<button class="cr-obj" data-crsec="1" aria-label="Affirmations" style="transform:rotate(3deg)">'+
+      '<div style="position:relative;width:122px;min-height:118px;background:'+noteBg+';padding:16px 10px 10px;box-shadow:1px 3px 10px rgba(0,0,0,'+(dark?'.45':'.13')+');border-radius:2px;text-align:left;display:flex;flex-direction:column">'+
+        '<div style="position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:13px;height:13px;border-radius:50%;background:'+p.accent+';box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>'+
+        (firstAff?'<div class="serif cr-clamp" style="font-size:12.5px;font-style:italic;color:'+noteTxt+';line-height:1.45;flex:1">'+esc(firstAff.text)+'</div>':
+          '<div style="flex:1;display:flex;align-items:center;justify-content:center;font-family:\'Caveat\',cursive;font-size:16px;color:'+noteTxt+';opacity:.7;text-align:center">pin up something kind</div>')+
+        '<div style="font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:'+noteTxt+';opacity:.55;margin-top:6px">Affirmations</div>'+
+      '</div></button>';
+
+    var recordObj='<button class="cr-obj" data-crsec="2" aria-label="Songs">'+
+      '<div style="width:58px;height:58px;border-radius:50%;margin:0 auto;background:radial-gradient(circle,'+p.accent+' 0 9px,#1c1410 10px,#2a201a 14px,#16100c 15px,#2a201a 19px,#16100c 20px,#2a201a 24px,#1c1410 29px);box-shadow:0 3px 6px rgba(0,0,0,.3)"></div>'+
       '</button>';
-    }
+
+    var envObj='<button class="cr-obj" data-crsec="3" aria-label="Notes to Me">'+
+      '<div style="position:relative;width:66px;height:44px;margin:7px auto 0;background:'+(dark?'#d8c8a4':'#f3e7cc')+';border-radius:3px;box-shadow:0 3px 6px rgba(0,0,0,.2);overflow:hidden">'+
+        '<div style="position:absolute;inset:0;background:linear-gradient(to bottom right,transparent 49%,rgba(120,90,40,.25) 50%,transparent 52%),linear-gradient(to bottom left,transparent 49%,rgba(120,90,40,.25) 50%,transparent 52%)"></div>'+
+        '<div style="position:absolute;top:15px;left:50%;transform:translateX(-50%);width:13px;height:13px;border-radius:50%;background:'+p.accent+'"></div>'+
+      '</div>'+
+      '</button>';
+
+    var tapeObj='<button class="cr-obj" data-crsec="4" aria-label="Voices">'+
+      '<div style="position:relative;width:68px;height:44px;margin:7px auto 0;background:'+(dark?'#3a3028':'#5a4a3c')+';border-radius:5px;box-shadow:0 3px 6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center">'+
+        '<div style="width:50px;height:18px;border-radius:9px;background:'+(dark?'#d8c8a4':'#f3e7cc')+';display:flex;align-items:center;justify-content:space-between;padding:0 4px">'+
+          '<span style="width:11px;height:11px;border-radius:50%;border:2.5px solid #5a4a3c"></span><span style="width:11px;height:11px;border-radius:50%;border:2.5px solid #5a4a3c"></span>'+
+        '</div></div>'+
+      '</button>';
 
     var coverBody=
-      '<div class="cr-grain" style="min-height:100%;background:'+p.bg+';padding:12px 10px 80px">'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'+
-        secCard('&#128248;','Memories',ph,ph===1?'photo':'photos',0,'Add your first photo')+
-        secCard('&#128173;','Affirmations',af,af===1?'affirmation':'affirmations',1,'Add something kind')+
-        secCard('&#127925;','Songs',sg,sg===1?'song':'songs',2,'Add a comfort song')+
-        secCard('&#9993;&#65039;','Notes to Me',nt,nt===1?'note':'notes',3,'Write to future you')+
-      '</div>'+
-      '<div style="margin-bottom:10px">'+
-        (function(){var vc2=S.crVoices?S.crVoices.length:0;return secCard('&#127908;','Voices',vc2,vc2===1?'voice':'voices',4,'Save a voice that makes you feel safe');})()+
-      '</div>'+
-      '<div style="text-align:center;margin-top:8px">'+
-        '<div id="cr-companion" style="cursor:pointer;display:inline-block">'+
-          '<span class="cr-mascot" style="font-size:48px;display:block;line-height:1">'+mascot.e+'</span>'+
-          '<div style="font-size:13px;font-family:\'Caveat\',cursive;color:'+p.txt+';margin-top:4px;opacity:.8">'+esc(S.crMascotName)+'</div>'+
-          '<div style="font-size:10px;color:'+p.txt+';opacity:.4;margin-top:2px">tap to redecorate</div>'+
+      '<div class="cr-grain cr-room" style="height:100%;overflow-y:auto;background:'+wallTop+','+p.bg+';padding:14px 14px 28px">'+
+        /* companion */
+        '<div style="text-align:center;margin-bottom:18px">'+
+          '<div id="cr-companion" role="button" tabindex="0" aria-label="'+esc(S.crMascotName)+' — tap to redecorate" style="cursor:pointer;display:inline-block">'+
+            '<span class="cr-mascot" style="font-size:64px;display:block;line-height:1.05;filter:drop-shadow(0 6px 10px rgba(0,0,0,'+(dark?'.4':'.12')+'))">'+mascot.e+'</span>'+
+            '<div style="font-family:\'Caveat\',cursive;font-size:22px;color:'+p.txt+';margin-top:4px">'+esc(S.crMascotName)+'</div>'+
+          '</div>'+
+          '<div class="serif" style="font-size:14px;font-style:italic;color:'+p.txt+';opacity:.8;margin-top:2px">'+hello+'</div>'+
         '</div>'+
-      '</div>'+
+        /* wall */
+        '<div style="display:flex;justify-content:center;align-items:flex-start;gap:22px;margin-bottom:26px">'+polaroidObj+noteObj+'</div>'+
+        /* shelf */
+        '<div style="display:flex;justify-content:space-around;align-items:flex-end;padding:0 4px">'+recordObj+envObj+tapeObj+'</div>'+
+        '<div style="height:9px;margin:2px -2px 0;border-radius:3px;background:linear-gradient(180deg,'+p.floor+','+p.floor+'cc);box-shadow:0 7px 12px -4px rgba(0,0,0,'+(dark?'.55':'.22')+')"></div>'+
+        '<div style="display:flex;justify-content:space-around;padding:0 4px">'+
+          '<button class="cr-obj" data-crsec="2" tabindex="-1" aria-hidden="true" style="'+lbl+';margin-top:8px;width:86px;white-space:nowrap">Songs</button>'+
+          '<button class="cr-obj" data-crsec="3" tabindex="-1" aria-hidden="true" style="'+lbl+';margin-top:8px;width:86px;white-space:nowrap">Notes to Me</button>'+
+          '<button class="cr-obj" data-crsec="4" tabindex="-1" aria-hidden="true" style="'+lbl+';margin-top:8px;width:86px;white-space:nowrap">Voices</button>'+
+        '</div>'+
+        '<div style="text-align:center;font-size:10px;color:'+p.txt+';opacity:.45;margin-top:22px">Tap '+esc(S.crMascotName||'your companion')+' to redecorate</div>'+
       (S.crRedecoConfirm?
         '<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:340px;background:var(--bg);border-radius:20px 20px 0 0;padding:20px;box-shadow:0 -4px 20px rgba(0,0,0,.15);z-index:50">'+
           '<div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px">Redecorate your room?</div>'+
@@ -1714,7 +1770,7 @@ function drawComfortScrapbook(){
     var crbk=Q('mcbk');if(crbk){crbk.style.setProperty('color',p.txt,'important');var cri=crbk.querySelector('i');if(cri)cri.style.setProperty('color',p.txt,'important');}
     Q('mcbk').onclick=function(){if(sh)sh.style.background='';if(crtb)crtb.style.background='';S.myCornerTab=null;go('mycorner');};
 
-    var comp=Q('cr-companion');if(comp)comp.onclick=function(){S.crRedecoConfirm=true;drawComfortScrapbook();};
+    var comp=Q('cr-companion');if(comp){comp.onclick=function(){S.crRedecoConfirm=true;drawComfortScrapbook();};comp.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();comp.onclick();}};}
     var rdno=Q('rdno');if(rdno)rdno.onclick=function(){S.crRedecoConfirm=false;drawComfortScrapbook();};
     var rdyes=Q('rdyes');if(rdyes)rdyes.onclick=function(){S.crRedecoConfirm=false;if(sh)sh.style.background='';S.crSetup=false;drawComfortSetup();};
 
@@ -1731,7 +1787,7 @@ function drawComfortScrapbook(){
     /* Page 0 — Memories */
     '<div style="padding:12px 8px 70px">'+(S.crPhotos.length?
       '<div style="display:flex;flex-wrap:wrap;justify-content:center">'+S.crPhotos.map(polaroid).join('')+'</div>':
-      '<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:30px 20px 10px">Nothing yet. Add your first photo.</div>')+
+      '<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:30px 20px 10px">The walls are bare for now. Add a photo of someone or somewhere that feels like home.</div>')+
       '<div style="margin-top:16px;border-top:1px dashed '+p.bdr+';padding-top:14px">'+
         '<button id="cr-addphoto" style="display:block;width:100%;padding:10px;background:none;border:1.5px dashed '+p.bdr+';border-radius:12px;font-size:13px;color:'+p.accent+';cursor:pointer;font-family:\'DM Sans\',sans-serif">+ Add photos or videos</button>'+
       '</div>'+
@@ -1739,13 +1795,13 @@ function drawComfortScrapbook(){
 
     /* Page 1 — Affirmations */
     '<div style="padding:16px 12px 70px">'+
-      (S.crAffirmations.length?S.crAffirmations.map(affCard).join(''):'<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:30px 20px 10px">Nothing yet. Add something kind.</div>')+
+      (S.crAffirmations.length?S.crAffirmations.map(affCard).join(''):'<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:30px 20px 10px">Nothing pinned up yet. Write yourself something kind, or borrow one below.</div>')+
       '<div style="margin-top:8px;border-top:1px dashed '+p.bdr+';padding-top:14px">'+
         (S.crAffEditIdx!==-1&&S.crAffEditIdx!==undefined?
-          '<div style="font-size:11px;font-weight:600;color:var(--acc);margin-bottom:4px">Editing affirmation</div>':'')+
-        '<textarea id="cr-afftxt" rows="2" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:14px;font-family:\'DM Serif Display\',serif;font-style:italic;background:'+p.card+';color:'+p.txt+';resize:none;margin-bottom:6px" placeholder="Write an affirmation...">'+esc(S.crAffText||'')+'</textarea>'+
-        '<button id="cr-affsave" style="width:100%;padding:9px;margin-bottom:8px;background:'+p.accent+';color:#fff;border:none;border-radius:12px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Save affirmation</button>'+
-        '<div style="font-size:11px;color:'+p.txt+';opacity:.5;margin-bottom:6px;font-weight:500">Or choose a preset:</div>'+
+          '<div style="font-size:11px;font-weight:600;color:var(--acc);margin-bottom:4px">Changing this one</div>':'')+
+        '<textarea id="cr-afftxt" rows="2" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:14px;font-family:\'DM Serif Display\',serif;font-style:italic;background:'+p.card+';color:'+p.txt+';resize:none;margin-bottom:6px" placeholder="Something you need to hear…">'+esc(S.crAffText||'')+'</textarea>'+
+        '<button id="cr-affsave" style="width:100%;padding:9px;margin-bottom:8px;background:'+p.accent+';color:#fff;border:none;border-radius:12px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Pin it up</button>'+
+        '<div style="font-size:11px;color:'+p.txt+';opacity:.5;margin-bottom:6px;font-weight:500">Or borrow one of these:</div>'+
         '<div style="display:flex;flex-wrap:wrap;gap:6px">'+
           PRESET_AFFS.map(function(aff,pi){
             return '<button data-preset="'+pi+'" style="padding:6px 10px;background:'+p.card+';border:1px solid '+p.bdr+';border-radius:20px;font-size:11px;color:'+p.txt+';cursor:pointer;font-family:\'DM Serif Display\',serif;font-style:italic;text-align:left">'+esc(aff.slice(0,30))+(aff.length>30?'&#8230;':'')+'</button>';
@@ -1756,11 +1812,11 @@ function drawComfortScrapbook(){
 
     /* Page 2 — Songs */
     '<div style="padding:14px 12px 70px">'+
-      (S.crSongs.length?S.crSongs.map(songStub).join(''):'<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:30px 20px 10px">Nothing yet. Add a comfort song.</div>')+
+      (S.crSongs.length?S.crSongs.map(songStub).join(''):'<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:30px 20px 10px">No songs yet. Add the one you play when you need to feel okay.</div>')+
       '<div style="margin-top:8px;border-top:1px dashed '+p.bdr+';padding-top:14px">'+
         '<input id="cr-sgname" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:13px;background:'+p.card+';color:'+p.txt+';margin-bottom:6px;font-family:\'DM Sans\',sans-serif" placeholder="Song name — Artist" value="'+esc(S.crSongDraft&&S.crSongDraft.name||'')+'">'+
         '<input id="cr-sgurl" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:13px;background:'+p.card+';color:'+p.txt+';margin-bottom:6px;font-family:\'DM Sans\',sans-serif" placeholder="Paste a link (Spotify, YouTube&#8230;)" value="'+esc(S.crSongDraft&&S.crSongDraft.url||'')+'">'+
-        '<button id="cr-sgsave" style="width:100%;padding:9px;background:'+p.accent+';color:#fff;border:none;border-radius:12px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Save song</button>'+
+        '<button id="cr-sgsave" style="width:100%;padding:9px;background:'+p.accent+';color:#fff;border:none;border-radius:12px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Keep this song</button>'+
       '</div>'+
     '</div>',
 
@@ -1769,11 +1825,11 @@ function drawComfortScrapbook(){
       '<div style="background:rgba(0,0,0,.04);border-radius:12px;padding:12px 14px;margin-bottom:14px"><div style="font-size:13px;font-weight:500;color:'+p.txt+';margin-bottom:4px">Write to your future self</div><div style="font-size:12px;color:'+p.txt+';opacity:.65;line-height:1.5">Set a date and seal your note — it stays locked until that day arrives. A little kindness from past you, waiting at the right moment.</div></div>'+
       (S.crNotes.length?
         S.crNotes.map(function(n,i){var openD=new Date(n.openDate+'T00:00:00');return envelope(n,i,today>=openD);}).join(''):
-        '<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:20px 20px 10px">Nothing yet. Write to future you.</div>')+
+        '<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:20px 20px 10px">No letters waiting yet. Write one for a day that might need it.</div>')+
       '<div style="margin-top:8px;border-top:1px dashed '+p.bdr+';padding-top:14px">'+
         '<textarea id="cr-notetxt" rows="3" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:14px;font-family:\'DM Serif Display\',serif;font-style:italic;background:'+p.card+';color:'+p.txt+';resize:none;margin-bottom:6px" placeholder="Dear future me&#8230;">'+esc(S.crNoteText||'')+'</textarea>'+
         '<div style="display:flex;gap:8px;align-items:flex-end">'+
-          '<div style="flex:1"><div style="font-size:10px;color:var(--t3);margin-bottom:3px">Open on date</div>'+
+          '<div style="flex:1"><div style="font-size:10px;color:var(--t3);margin-bottom:3px">Open it on</div>'+
             '<input type="date" id="cr-notedate" min="'+todayStr+'" value="'+esc(S.crNoteDate||'')+'" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:13px;background:'+p.card+';color:'+p.txt+';font-family:\'DM Sans\',sans-serif"></div>'+
           '<button id="cr-notesave" style="padding:9px 14px;background:'+p.accent+';color:#fff;border:none;border-radius:12px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Seal</button>'+
         '</div>'+
@@ -1783,29 +1839,35 @@ function drawComfortScrapbook(){
     /* Page 4 — Voices */
     (function(){
       function voiceCard(v,i){
-        var cached=voiceCache[v.id];
+        var src=v.data||'';
         return '<div style="background:'+p.card+';border:1px solid '+p.bdr+';border-radius:14px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px">'+
-          '<div style="width:40px;height:40px;border-radius:50%;background:'+p.accent+';opacity:.15;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px">🎙</div>'+
+          '<div style="width:40px;height:40px;border-radius:50%;background:'+p.accent+'26;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px">🎙</div>'+
           '<div style="flex:1;min-width:0">'+
             '<div style="font-size:13px;font-weight:600;color:'+p.txt+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(v.label)+'</div>'+
-            (cached?'<audio id="va-'+v.id+'" src="'+cached+'" controls style="width:100%;height:28px;margin-top:4px;accent-color:'+p.accent+'"></audio>':
-              '<div style="font-size:11px;color:'+p.txt+';opacity:.45;margin-top:3px">Re-open app to hear this again</div>')+
+            (src?'<audio id="va-'+v.id+'" src="'+src+'" controls preload="metadata" style="width:100%;height:28px;margin-top:4px;accent-color:'+p.accent+'"></audio>':
+              '<div style="font-size:11px;color:'+p.txt+';opacity:.75;margin-top:3px;line-height:1.45">This recording is no longer available. Delete and re-record, or upload an audio file instead.</div>')+
           '</div>'+
-          '<button data-vcdel="'+i+'" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:18px;flex-shrink:0">&#215;</button>'+
+          '<button data-vcdel="'+i+'" aria-label="Delete '+esc(v.label)+'" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:18px;flex-shrink:0">&#215;</button>'+
         '</div>';
       }
-      var vcList=S.crVoices&&S.crVoices.length?S.crVoices.map(voiceCard).join(''):'<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:30px 20px 10px">Nothing here yet. Save a voice that makes you feel safe.</div>';
+      var vcList=S.crVoices&&S.crVoices.length?S.crVoices.map(voiceCard).join(''):'<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.55;text-align:center;padding:30px 20px 10px;line-height:1.6">No voices here yet. Keep one that makes you feel safe — a friend, a parent, or your own.</div>';
+      var msgHtml=voiceMsg?
+        '<div style="display:flex;align-items:flex-start;gap:8px;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.5;'+
+          (voiceMsg.ok?'background:var(--gbg);border:1.5px solid var(--gbdr);color:var(--gt)':'background:var(--sos);border:1.5px solid var(--sosbdr);color:var(--sosh)')+'">'+
+          '<span style="flex-shrink:0">'+(voiceMsg.ok?'✓':'!')+'</span><span>'+esc(voiceMsg.text)+'</span></div>':'';
       return '<div style="padding:14px 12px 70px">'+
+        msgHtml+
         vcList+
         '<div style="margin-top:10px;border-top:1px dashed '+p.bdr+';padding-top:14px">'+
-          '<div style="font-size:12px;font-weight:500;color:'+p.txt+';opacity:.7;margin-bottom:8px">Record a voice note</div>'+
+          '<div style="font-size:12px;font-weight:500;color:'+p.txt+';opacity:.75;margin-bottom:4px">Record a voice note</div>'+
+          '<div style="font-size:11px;color:'+p.txt+';opacity:.6;margin-bottom:8px;line-height:1.45">Up to 1 minute. It stays on this device, so it\'ll still be here next time.</div>'+
           '<div style="display:flex;gap:8px;margin-bottom:10px">'+
-            '<input id="vc-label" placeholder="Name this voice..." style="flex:1;padding:9px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:13px;background:'+p.card+';color:'+p.txt+';font-family:\'DM Sans\',sans-serif">'+
+            '<input id="vc-label" placeholder="Whose voice is this?" style="flex:1;min-width:0;padding:9px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:13px;background:'+p.card+';color:'+p.txt+';font-family:\'DM Sans\',sans-serif"'+(voiceRecording?' disabled':'')+'>'+
             '<button id="vc-rec" style="padding:9px 14px;background:'+(voiceRecording?'var(--acc)':p.accent)+';color:#fff;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif;white-space:nowrap">'+(voiceRecording?'⏹ Stop':'⏺ Record')+'</button>'+
           '</div>'+
-          (voiceRecording?'<div style="font-size:12px;color:var(--acc);margin-bottom:10px;animation:pulse 1s infinite">● Recording…</div>':'')+
-          '<div style="font-size:12px;font-weight:500;color:'+p.txt+';opacity:.7;margin-bottom:6px">Or upload an audio file</div>'+
-          '<button id="vc-upload" style="display:block;width:100%;padding:9px;background:none;border:1.5px dashed '+p.bdr+';border-radius:12px;font-size:13px;color:'+p.accent+';cursor:pointer;font-family:\'DM Sans\',sans-serif">+ Upload voice note</button>'+
+          (voiceRecording?'<div id="vc-timer" style="font-size:12px;color:var(--acc);margin-bottom:10px;animation:pulse 1s infinite">● Recording… '+fmtVoiceSecs(Math.floor((Date.now()-voiceStart)/1000))+' / 1:00</div>':'')+
+          '<div style="font-size:12px;font-weight:500;color:'+p.txt+';opacity:.75;margin-bottom:6px">Or upload an audio file</div>'+
+          '<button id="vc-upload" style="display:block;width:100%;padding:9px;background:none;border:1.5px dashed '+p.bdr+';border-radius:12px;font-size:13px;color:'+p.accent+';cursor:pointer;font-family:\'DM Sans\',sans-serif">+ Upload a voice note (up to 3 MB)</button>'+
         '</div>'+
       '</div>';
     })()
@@ -1821,7 +1883,7 @@ function drawComfortScrapbook(){
   var crtb=document.querySelector('.shell .tb');if(crtb)crtb.style.background=p.bg;
   var crbk=Q('mcbk');if(crbk){crbk.style.setProperty('color',p.txt,'important');var cri=crbk.querySelector('i');if(cri)cri.style.setProperty('color',p.txt,'important');}
   var crtit=crtb&&crtb.querySelector('span');if(crtit)crtit.style.color=p.txt;
-  Q('mcbk').onclick=function(){if(sh)sh.style.background='';if(crtb)crtb.style.background='';S.crSection=null;S.crRedecoConfirm=false;drawComfortScrapbook();};
+  Q('mcbk').onclick=function(){if(sh)sh.style.background='';if(crtb)crtb.style.background='';S.crSection=null;S.crRedecoConfirm=false;voiceMsg=null;drawComfortScrapbook();};
 
   var addPh=Q('cr-addphoto');
   if(addPh)addPh.onclick=function(){
@@ -1952,34 +2014,60 @@ function drawComfortScrapbook(){
   document.querySelectorAll('[data-notedel]').forEach(function(b){b.onclick=function(){S.crNotes.splice(parseInt(b.dataset.notedel),1);saveS();S.crSection=3;drawComfortScrapbook();};});
 
   /* ── Voices bindings ── */
-  function saveVoice(blob,label){
-    var id=Date.now();
-    var url=URL.createObjectURL(blob);
-    voiceCache[id]=url;
+  /* Voices are stored as base64 data URLs inside the saved state so they survive a reload.
+     Before saving we check the size and that the write really succeeded; if not, the entry is
+     rolled back and a clear message is shown — never a silent, unplayable entry. */
+  function showVoiceMsg(ok,text){voiceMsg={ok:ok,text:text};if((S.scr==='mycorner'||S.scr==='comfort')&&S.myCornerTab==='comfort'&&S.crSection===4)drawComfortScrapbook();}
+  function persistVoice(dataUrl,label){
     if(!S.crVoices)S.crVoices=[];
-    S.crVoices.unshift({id:id,label:label||'Voice note'});
-    saveS();S.crSection=4;drawComfortScrapbook();
+    var entry={id:Date.now(),label:label||'Voice note',data:dataUrl};
+    S.crVoices.unshift(entry);
+    var json;try{json=aoSerialize();}catch(e){json=null;}
+    var ok=false;
+    if(json&&json.length<=AO_STORE_LIMIT){try{localStorage.setItem('ao_s',json);ok=true;}catch(e){ok=false;}}
+    if(!ok){
+      S.crVoices.shift();
+      showVoiceMsg(false,'There isn\'t enough room on this device to keep that recording. Try a shorter one, or delete an older voice or photo to make space.');
+      return;
+    }
+    showVoiceMsg(true,'Saved “'+entry.label+'”. It\'ll be here whenever you need it.');
+  }
+  function saveVoice(blob,label){
+    var reader=new FileReader();
+    reader.onload=function(){persistVoice(reader.result,label);};
+    reader.onerror=function(){showVoiceMsg(false,'That recording couldn\'t be read, so it wasn\'t saved. Please try again.');};
+    reader.readAsDataURL(blob);
   }
   var vcRec=Q('vc-rec');
   if(vcRec)vcRec.onclick=function(){
     if(voiceRecording){
-      if(voiceRecorder)voiceRecorder.stop();
-    } else {
-      var lbl=(Q('vc-label')?Q('vc-label').value.trim():'')||'Voice note';
-      navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-        voiceChunks=[];voiceRecording=true;
-        voiceRecorder=new MediaRecorder(stream);
-        voiceRecorder.ondataavailable=function(e){if(e.data.size>0)voiceChunks.push(e.data);};
-        voiceRecorder.onstop=function(){
-          voiceRecording=false;
-          stream.getTracks().forEach(function(t){t.stop();});
-          var blob=new Blob(voiceChunks,{type:'audio/webm'});
-          saveVoice(blob,lbl);
-        };
-        voiceRecorder.start();
-        drawComfortScrapbook();
-      }).catch(function(){voiceRecording=false;alert('Microphone access needed to record.');});
+      if(voiceRecorder&&voiceRecorder.state!=='inactive')voiceRecorder.stop();
+      return;
     }
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){
+      showVoiceMsg(false,'Recording isn\'t available in this browser. You can upload an audio file instead.');return;
+    }
+    var lbl=(Q('vc-label')?Q('vc-label').value.trim():'')||'Voice note';
+    voiceMsg=null;
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+      voiceChunks=[];voiceRecording=true;voiceStart=Date.now();
+      voiceRecorder=new MediaRecorder(stream);
+      voiceRecorder.ondataavailable=function(e){if(e.data.size>0)voiceChunks.push(e.data);};
+      voiceRecorder.onstop=function(){
+        voiceRecording=false;
+        if(voiceTimer){clearTimeout(voiceTimer);voiceTimer=null;}
+        if(voiceTick){clearInterval(voiceTick);voiceTick=null;}
+        stream.getTracks().forEach(function(t){t.stop();});
+        var blob=new Blob(voiceChunks,{type:voiceRecorder.mimeType||'audio/webm'});
+        if(!blob.size){showVoiceMsg(false,'Nothing was recorded. Please try again.');return;}
+        saveVoice(blob,lbl);
+      };
+      voiceRecorder.start();
+      /* Hard cap at 60 seconds */
+      voiceTimer=setTimeout(function(){if(voiceRecorder&&voiceRecorder.state!=='inactive')voiceRecorder.stop();},VOICE_MAX_SEC*1000);
+      voiceTick=setInterval(function(){var el=Q('vc-timer');if(el)el.textContent='● Recording… '+fmtVoiceSecs(Math.min(VOICE_MAX_SEC,Math.floor((Date.now()-voiceStart)/1000)))+' / 1:00';},500);
+      S.crSection=4;drawComfortScrapbook();
+    }).catch(function(){voiceRecording=false;showVoiceMsg(false,'I couldn\'t reach your microphone. Check that this page is allowed to use it, or upload an audio file instead.');});
   };
   var vcUp=Q('vc-upload');
   if(vcUp)vcUp.onclick=function(){
@@ -1989,6 +2077,7 @@ function drawComfortScrapbook(){
     fi.onchange=function(e){
       document.body.removeChild(fi);
       var file=e.target.files[0];if(!file)return;
+      if(file.size>VOICE_MAX_UPLOAD){showVoiceMsg(false,'That file is too big to keep here — the limit is 3 MB. A clip of a minute or two usually fits.');return;}
       var lbl=(Q('vc-label')?Q('vc-label').value.trim():'')||file.name.replace(/\.[^.]+$/,'');
       saveVoice(file,lbl);
     };
@@ -1996,7 +2085,7 @@ function drawComfortScrapbook(){
   };
   document.querySelectorAll('[data-vcdel]').forEach(function(b){b.onclick=function(){
     var i=parseInt(b.dataset.vcdel);
-    var v=S.crVoices[i];if(v&&voiceCache[v.id]){URL.revokeObjectURL(voiceCache[v.id]);delete voiceCache[v.id];}
+    voiceMsg=null;
     S.crVoices.splice(i,1);saveS();S.crSection=4;drawComfortScrapbook();
   };});
 }
