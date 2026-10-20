@@ -108,10 +108,23 @@ canvas{display:block;touch-action:none}
 .cr-in{animation:crIn .5s ease both}
 @keyframes crIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .cr-sec-in{animation:cfade .3s ease both}
-.cr-light{position:absolute;width:6px;height:8px;border-radius:50% 50% 45% 45%;animation:crTwinkle 3.6s ease-in-out infinite}
+.cr-light{position:absolute;width:6px;height:8px;border-radius:50% 50% 45% 45%;animation:crTwinkle 3s ease-in-out infinite}
 @keyframes crTwinkle{0%,100%{opacity:.55}50%{opacity:1}}
-.cr-plant-sway{position:absolute;inset:0;transform-origin:28px 100%;animation:crPlant 8s ease-in-out infinite}
-@keyframes crPlant{0%,100%{transform:rotate(-1.5deg)}50%{transform:rotate(1.5deg)}}
+.cr-plant-sway{position:absolute;inset:0;transform-origin:28px calc(100% - 18px);animation:crPlant 4s ease-in-out infinite}
+@keyframes crPlant{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+.cr-lamp-glow{position:absolute;border-radius:50%;pointer-events:none;animation:crLampGlow 6s ease-in-out infinite}
+@keyframes crLampGlow{0%,100%{filter:brightness(.92);opacity:.85}50%{filter:brightness(1.08);opacity:1}}
+.cr-fire-glow{position:absolute;border-radius:50%;pointer-events:none;animation:crFireGlow 1.6s ease-in-out infinite}
+@keyframes crFireGlow{0%,100%{opacity:.7}30%{opacity:.9}60%{opacity:.78}}
+.cr-flame{position:absolute;left:50%;bottom:4px;border-radius:50% 50% 45% 45%/65% 65% 35% 35%;transform-origin:50% 100%}
+.cr-flame.f1{animation:crFlame1 1.6s ease-in-out infinite}.cr-flame.f2{animation:crFlame2 1.2s ease-in-out infinite}.cr-flame.f3{animation:crFlame3 .9s ease-in-out infinite}
+@keyframes crFlame1{0%,100%{transform:translateX(-50%) scale(1,1)}30%{transform:translateX(calc(-50% + 1px)) scale(.96,1.07)}60%{transform:translateX(calc(-50% - 1px)) scale(1.03,.94)}}
+@keyframes crFlame2{0%,100%{transform:translateX(-50%) scale(1,1)}40%{transform:translateX(calc(-50% - 1px)) scale(.94,1.1)}70%{transform:translateX(calc(-50% + 1px)) scale(1.04,.95)}}
+@keyframes crFlame3{0%,100%{transform:translateX(-50%) scale(1,1)}50%{transform:translateX(-50%) scale(.9,1.14)}}
+.cr-dtile{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px 9px;border-radius:14px;background:var(--bg2);border:1.5px solid var(--bdr);cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .15s ease}
+.cr-dtile:active{transform:scale(.96)}
+.cr-dtile.on{border:2px solid var(--grn);background:var(--gbg)}
+.cr-dprev{position:relative;width:76px;height:54px;border-radius:10px;overflow:hidden;display:flex;align-items:flex-end;justify-content:center}
 .cr-sheet-ov{position:absolute;inset:0;background:rgba(0,0,0,.42);display:flex;align-items:flex-end;z-index:120}
 .cr-sheet{background:var(--bg);border-radius:20px 20px 0 0;padding:20px 18px 24px;width:100%;box-shadow:0 -4px 20px rgba(0,0,0,.15)}
 .cr-sheet-ov.anim{animation:crFade .25s ease}.cr-sheet-ov.anim .cr-sheet{animation:crUp .3s ease}
@@ -135,7 +148,7 @@ canvas{display:block;touch-action:none}
 .cr-obj:focus-visible,#cr-companion:focus-visible{outline:2px dashed currentColor;outline-offset:4px}
 .cr-clamp{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
 .cr-room::-webkit-scrollbar{display:none}
-@media (prefers-reduced-motion:reduce){.cr-mascot,.aff-sway,.cr-shimmer,.cr-in,.cr-sec-in,.cr-light,.cr-plant-sway,.cr-sheet-ov,.cr-sheet,.mc-pulse,.mc-fade,.mc-in{animation:none!important}}
+@media (prefers-reduced-motion:reduce){.cr-mascot,.aff-sway,.cr-shimmer,.cr-in,.cr-sec-in,.cr-light,.cr-plant-sway,.cr-lamp-glow,.cr-fire-glow,.cr-flame,.cr-sheet-ov,.cr-sheet,.mc-pulse,.mc-fade,.mc-in{animation:none!important}}
 @keyframes polshadow{0%,100%{box-shadow:3px 4px 12px rgba(0,0,0,.18)}50%{box-shadow:5px 6px 18px rgba(0,0,0,.25)}}
 </style>
 </head>
@@ -193,7 +206,7 @@ var CR_MASCOTS=[
   {id:'bear',e:'🐻',name:'Bear',desc:'Steady, grounding'}
 ];
 var PRESET_AFFS=['I am doing the best I can, and that is enough.','This feeling will pass.','I am allowed to take up space.','My anxiety does not define me.','I am worthy of rest and peace.','I am more than my worries.','I choose to be kind to myself today.','I am safe right now.','Progress, not perfection.','My feelings are valid.','I trust myself to handle what comes.','I deserve gentleness.'];
-function mkS(){return{ob:false,obStep:0,obPath:'',name:'',dob:'',emergContact:{name:'',phone:''},notifEnabled:false,notifTime:'09:00',lastNotifDate:'',lastSupNotifDate:'',scr:'mood',mood:null,moodHist:{},streak:0,dump:'',micOn:false,ventDone:false,ventSaved:false,ventLog:[],ventEditIdx:-1,ventHistDate:undefined,supTab:'sos',trickModal:false,tricks:['ground','candy','cold'],customTricks:[],jv:['','',''],jlog:[],winEditIdx:-1,profEdit:false,pName:'',pDob:'',confirmDelete:false,calmTab:'games',unsentComposing:false,unsentDraftTo:'',unsentDraftText:'',unsentMicOn:false,unsentDrawer:[],wcsDraft:'',wcsLog:[],wcsEditIdx:-1,wcsSaved:false,crSetup:false,crColor:'amber',crMascot:null,crMascotName:'',crPhotos:[],crAffirmations:[],crSongs:[],crNotes:[],crOpenDrawers:{photos:false,affirmations:false,songs:false,notes:false},crAffText:'',crSongDraft:{name:'',url:''},crNoteText:'',crNoteDate:'',myCornerTab:null,crPage:0,crSection:null,crRedecoConfirm:false,crAffEditIdx:-1,doodleGallery:[],crVoices:[],crFairyLights:false,crPlantStage:0,crPlantLastSeen:'',crDecorOpen:false};}
+function mkS(){return{ob:false,obStep:0,obPath:'',name:'',dob:'',emergContact:{name:'',phone:''},notifEnabled:false,notifTime:'09:00',lastNotifDate:'',lastSupNotifDate:'',scr:'mood',mood:null,moodHist:{},streak:0,dump:'',micOn:false,ventDone:false,ventSaved:false,ventLog:[],ventEditIdx:-1,ventHistDate:undefined,supTab:'sos',trickModal:false,tricks:['ground','candy','cold'],customTricks:[],jv:['','',''],jlog:[],winEditIdx:-1,profEdit:false,pName:'',pDob:'',confirmDelete:false,calmTab:'games',unsentComposing:false,unsentDraftTo:'',unsentDraftText:'',unsentMicOn:false,unsentDrawer:[],wcsDraft:'',wcsLog:[],wcsEditIdx:-1,wcsSaved:false,crSetup:false,crColor:'amber',crMascot:null,crMascotName:'',crPhotos:[],crAffirmations:[],crSongs:[],crNotes:[],crOpenDrawers:{photos:false,affirmations:false,songs:false,notes:false},crAffText:'',crSongDraft:{name:'',url:''},crNoteText:'',crNoteDate:'',myCornerTab:null,crPage:0,crSection:null,crRedecoConfirm:false,crAffEditIdx:-1,doodleGallery:[],crVoices:[],crFairyLights:false,crDecor:null,crPlantStage:0,crPlantLastSeen:'',crDecorOpen:false};}
 var S=mkS(),bRAF=null,bPS=null,bPI=0,gLoop=null,ambRAF=null,ambObj={},recog=null;
 var ventCollapsed={};
 var ventSortByDay=false;
@@ -206,10 +219,10 @@ var voiceCache={};
 var voiceRecorder=null,voiceChunks=[],voiceRecording=false,voiceTimer=null,voiceTick=null,voiceStart=0;
 var voiceMsg=null; /* {ok:bool,text:string} — banner on the Voices page */
 var VOICE_MAX_SEC=60,VOICE_MAX_UPLOAD=3*1024*1024,AO_STORE_LIMIT=4.8e6;
-var AO_PERSIST=['name','dob','ob','obPath','moodHist','streak','jlog','ventLog','wcsLog','unsentDrawer','tricks','customTricks','crSetup','crColor','crMascot','crMascotName','crPhotos','crAffirmations','crSongs','crNotes','crVoices','doodleGallery','crFairyLights','crPlantStage','crPlantLastSeen','emergContact','notifEnabled','notifTime','lastNotifDate','lastSupNotifDate'];
+var AO_PERSIST=['name','dob','ob','obPath','moodHist','streak','jlog','ventLog','wcsLog','unsentDrawer','tricks','customTricks','crSetup','crColor','crMascot','crMascotName','crPhotos','crAffirmations','crSongs','crNotes','crVoices','doodleGallery','crFairyLights','crDecor','crPlantStage','crPlantLastSeen','emergContact','notifEnabled','notifTime','lastNotifDate','lastSupNotifDate'];
 function aoSerialize(){var d={};AO_PERSIST.forEach(function(k){d[k]=S[k];});if(d.crPhotos)d.crPhotos=d.crPhotos.map(function(ph){var c=Object.assign({},ph);delete c.videoUrl;return c;});return JSON.stringify(d);}
 function saveS(){try{localStorage.setItem('ao_s',aoSerialize());}catch(e){try{localStorage.removeItem('ao_s');localStorage.setItem('ao_s',aoSerialize());}catch(e2){}}}
-function loadS(){try{var d=localStorage.getItem('ao_s');if(d){var p=JSON.parse(d);AO_PERSIST.forEach(function(k){if(p[k]!==undefined)S[k]=p[k];});if(S.crPhotos){var dirty=false;S.crPhotos.forEach(function(ph){if(ph.videoUrl){delete ph.videoUrl;dirty=true;}});if(dirty){try{localStorage.removeItem('ao_s');}catch(e){}saveS();}}}}catch(e){}}
+function loadS(){try{var d=localStorage.getItem('ao_s');if(d){var p=JSON.parse(d);AO_PERSIST.forEach(function(k){if(p[k]!==undefined)S[k]=p[k];});if(p.crDecor===undefined&&p.crSetup)S.crDecor=p.crFairyLights?'lights':'plant';if(S.crPhotos){var dirty=false;S.crPhotos.forEach(function(ph){if(ph.videoUrl){delete ph.videoUrl;dirty=true;}});if(dirty){try{localStorage.removeItem('ao_s');}catch(e){}saveS();}}}}catch(e){}}
 function Q(id){return document.getElementById(id);}
 function fmtVoiceSecs(n){return Math.floor(n/60)+':'+String(n%60).padStart(2,'0');}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -1643,33 +1656,108 @@ var CR_QUOTES=[
  'Leaves let go without any fuss at all.'
 ];
 function crQuoteOfDay(){var d=new Date();var n=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5);return CR_QUOTES[n%CR_QUOTES.length];}
-/* Fairy lights: a drooping wire with warm bulbs placed along the same curve */
+/* ── Comfort Room decorations (one at a time, cover page only) ── */
+var CR_DECOR=[
+  {k:'plant',e:'🌱',n:'Little Plant'},
+  {k:'lights',e:'✨',n:'Fairy Lights'},
+  {k:'lamp',e:'🕯',n:'Small Lamp'},
+  {k:'fire',e:'🔥',n:'Fireplace'},
+  {k:'snow',e:'❄️',n:'Soft Snow',hint:'pairs well with Deep Blue'}
+];
+/* Fairy lights: a drooping wire with soft bulbs placed along the same curve */
 function crFairyLightsHtml(){
-  var cols=['#ffd27a','#ffb38a','#fff0b8','#ffc070'],n=11,h='';
+  var cols=['#ffcf7a','#fff4dc','#ffc6d2','#d2efbe'],n=12,h='';
   for(var i=0;i<n;i++){
-    var t=.045+i*(.91/(n-1)),y=(1-t)*(1-t)*4+2*(1-t)*t*34+t*t*4,c=cols[i%cols.length];
-    h+='<span class="cr-light" style="left:calc('+(t*100).toFixed(2)+'% - 3px);top:'+(y+1).toFixed(1)+'px;background:'+c+';box-shadow:0 0 7px 2px '+c+'aa;animation-delay:-'+(i*.43).toFixed(2)+'s"></span>';
+    var t=.04+i*(.92/(n-1)),y=(1-t)*(1-t)*4+2*(1-t)*t*34+t*t*4,c=cols[i%cols.length];
+    var dur=(2+((i*7)%11)/5.5).toFixed(2); /* 2–4s, uneven */
+    h+='<span class="cr-light" style="left:calc('+(t*100).toFixed(2)+'% - 3px);top:'+(y+1).toFixed(1)+'px;background:'+c+';box-shadow:0 0 7px 2px '+c+'aa;animation-duration:'+dur+'s;animation-delay:-'+(i*.61).toFixed(2)+'s"></span>';
   }
   return '<div aria-hidden="true" style="position:absolute;top:0;left:6px;right:6px;height:32px;pointer-events:none">'+
     '<svg viewBox="0 0 100 30" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible"><path d="M0 4 Q50 34 100 4" fill="none" stroke="'+(dark?'rgba(230,200,150,.35)':'rgba(90,64,40,.4)')+'" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>'+h+'</div>';
 }
-/* A tiny CSS plant, stages 1–5 */
+/* Little plant in a terracotta pot, stages 1 (sprout) to 5 (five leaves) */
 function crPlantHtml(stage){
   stage=Math.max(1,Math.min(5,stage||1));
-  var g=dark?'#7cc060':'#5f9a45';
-  var stem=[7,15,24,32,36][stage-1];
-  var pairs=[[[5,.6]],[[6,.8],[13,.6]],[[7,1],[15,.85],[22,.6]],[[7,1],[16,.95],[24,.8],[30,.55]],[[7,1],[16,.95],[24,.8],[30,.6]]][stage-1];
-  var leaves=pairs.map(function(pr){
-    var w=(11*pr[1]).toFixed(1),hh=(5.5*pr[1]).toFixed(1),bt=18+pr[0];
-    return '<span style="position:absolute;bottom:'+bt+'px;left:calc(28px - '+w+'px);width:'+w+'px;height:'+hh+'px;background:'+g+';border-radius:100% 0 100% 0;transform:rotate(-28deg);transform-origin:100% 50%"></span>'+
-      '<span style="position:absolute;bottom:'+bt+'px;left:29px;width:'+w+'px;height:'+hh+'px;background:'+g+';border-radius:0 100% 0 100%;transform:rotate(28deg);transform-origin:0 50%"></span>';
+  var g1=dark?'#9ad672':'#7cbb57',g2=dark?'#4f8f3a':'#3f7a2c';
+  var stem=[6,12,19,25,30][stage-1];
+  var L=[[[4,-1,.55],[4,1,.55]],[[5,-1,.75],[10,1,.6]],[[5,-1,.85],[11,1,.8],[17,-1,.6]],[[5,-1,.95],[11,1,.9],[17,-1,.8],[23,1,.6]],[[5,-1,1],[11,1,.95],[17,-1,.9],[23,1,.8],[28,-1,.62]]][stage-1];
+  var leaves=L.map(function(l){
+    var w=(13*l[2]).toFixed(1),hh=(6.5*l[2]).toFixed(1),bt=18+l[0],left=l[1]<0;
+    return '<span style="position:absolute;bottom:'+bt+'px;'+(left?'left:calc(28px - '+w+'px)':'left:29px')+';width:'+w+'px;height:'+hh+'px;background:linear-gradient('+(left?'200deg':'160deg')+','+g1+','+g2+');border-radius:'+(left?'100% 0 100% 0':'0 100% 0 100%')+';transform:rotate('+(left?'-30deg':'30deg')+');transform-origin:'+(left?'100% 50%':'0 50%')+'"></span>';
   }).join('');
-  var flower=stage===5?'<span style="position:absolute;bottom:'+(18+stem-4)+'px;left:23.5px;width:10px;height:10px;border-radius:50%;background:#f2b84b;box-shadow:0 -5px 0 -1px #f8dfa0,5px 0 0 -1px #f8dfa0,-5px 0 0 -1px #f8dfa0,0 5px 0 -1px #f8dfa0"></span>':'';
   return '<div role="img" aria-label="A little plant" title="A little plant" style="position:relative;width:56px;height:64px;flex-shrink:0">'+
-    '<div class="cr-plant-sway"><span style="position:absolute;bottom:18px;left:27.5px;width:2px;height:'+stem+'px;background:'+g+';border-radius:1px"></span>'+leaves+flower+'</div>'+
-    '<span style="position:absolute;bottom:15px;left:11px;width:34px;height:5px;background:#a95c38;border-radius:2px"></span>'+
-    '<span style="position:absolute;bottom:0;left:13px;width:30px;height:16px;background:#c4744a;clip-path:polygon(0 0,100% 0,85% 100%,15% 100%)"></span>'+
+    '<div class="cr-plant-sway"><span style="position:absolute;bottom:18px;left:27.5px;width:2px;height:'+stem+'px;background:'+g2+';border-radius:1px"></span>'+leaves+'</div>'+
+    '<span style="position:absolute;bottom:15px;left:11px;width:34px;height:5px;background:linear-gradient(180deg,#c26a40,#9c5434);border-radius:2px"></span>'+
+    '<span style="position:absolute;bottom:0;left:13px;width:30px;height:16px;background:linear-gradient(90deg,#b8653e,#d4855a 45%,#b0603a);clip-path:polygon(0 0,100% 0,85% 100%,15% 100%)"></span>'+
   '</div>';
+}
+/* Bedside lamp — shade in the room's accent colour, softly pulsing glow */
+function crLampHtml(p){
+  var ga=dark?.55:.38;
+  return '<div role="img" aria-label="A small lamp" title="A small lamp" style="position:relative;width:64px;height:74px;flex-shrink:0">'+
+    '<div class="cr-lamp-glow" style="left:-18px;top:-14px;width:100px;height:90px;background:radial-gradient(circle at 50% 42%,rgba(255,206,120,'+ga+'),rgba(255,206,120,0) 65%)"></div>'+
+    '<span style="position:absolute;left:24px;top:30px;width:16px;height:9px;border-radius:50%;background:radial-gradient(circle,#fff6d8,#ffd98a 70%,rgba(255,217,138,0))"></span>'+
+    '<span style="position:absolute;left:13px;top:10px;width:38px;height:24px;background:linear-gradient(90deg,'+p.accent+'cc,'+p.accent+' 50%,'+p.accent+'bb);clip-path:polygon(22% 0,78% 0,100% 100%,0 100%);border-radius:2px"></span>'+
+    '<span style="position:absolute;left:30.5px;top:34px;width:3px;height:28px;background:linear-gradient(90deg,#8a6a48,#b08a62);border-radius:1px"></span>'+
+    '<span style="position:absolute;left:19px;bottom:4px;width:26px;height:9px;border-radius:50%;background:linear-gradient(180deg,#9c7650,#6e5034)"></span>'+
+  '</div>';
+}
+/* Fireplace — arch, mantle, three layered flames and a glow that flickers with them */
+function crFireplaceHtml(p){
+  var stone=dark?'linear-gradient(180deg,#6f5f4f,#5a4c3f)':'linear-gradient(180deg,#cdb89c,#b6a084)';
+  var ga=dark?.5:.35;
+  return '<div role="img" aria-label="A small fireplace" title="A small fireplace" style="position:relative;width:80px;height:70px;flex-shrink:0">'+
+    '<div class="cr-fire-glow" style="left:-14px;top:4px;width:108px;height:84px;background:radial-gradient(circle at 50% 66%,rgba(255,150,60,'+ga+'),rgba(255,150,60,0) 62%)"></div>'+
+    '<span style="position:absolute;left:0;top:6px;width:80px;height:7px;border-radius:2px;background:linear-gradient(180deg,'+p.floor+','+p.floor+'cc);box-shadow:0 2px 3px rgba(0,0,0,.2)"></span>'+
+    '<span style="position:absolute;left:6px;top:13px;width:68px;height:57px;background:'+stone+';border-radius:2px 2px 0 0"></span>'+
+    '<span style="position:absolute;left:19px;bottom:0;width:42px;height:36px;border-radius:21px 21px 0 0;background:radial-gradient(circle at 50% 100%,#4a2412,#22120a 70%);overflow:hidden">'+
+      '<span class="cr-flame f1" style="width:22px;height:26px;background:radial-gradient(circle at 50% 80%,#ffb347,#ff7a1a 70%);opacity:.92"></span>'+
+      '<span class="cr-flame f2" style="width:15px;height:19px;background:radial-gradient(circle at 50% 80%,#ffd27a,#ffab33 75%)"></span>'+
+      '<span class="cr-flame f3" style="width:8px;height:11px;background:radial-gradient(circle at 50% 75%,#fff6c8,#ffe27a 75%)"></span>'+
+      '<span style="position:absolute;left:9px;bottom:1px;width:24px;height:4px;border-radius:2px;background:#5a3420;transform:rotate(-8deg)"></span>'+
+      '<span style="position:absolute;left:10px;bottom:1px;width:22px;height:4px;border-radius:2px;background:#6e4028;transform:rotate(9deg)"></span>'+
+    '</span>'+
+  '</div>';
+}
+/* Soft snow — sparse, slow flakes on a canvas laid over the cover (taps pass straight through) */
+var crSnowRAF=null;
+function crStartSnow(){
+  if(crSnowRAF){cancelAnimationFrame(crSnowRAF);crSnowRAF=null;}
+  var c=Q('cr-snow');if(!c)return;
+  var dpr=Math.min(2,window.devicePixelRatio||1),w=c.clientWidth,h=c.clientHeight;if(!w||!h)return;
+  c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);
+  var ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  var flakes=[];for(var i=0;i<26;i++)flakes.push({x:Math.random()*w,y:Math.random()*h,r:.9+Math.random()*1.9,vy:14+Math.random()*20,amp:5+Math.random()*10,ph:Math.random()*6.28,sp:.25+Math.random()*.45,a:.35+Math.random()*.45});
+  var still=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches,last=0;
+  function paint(){
+    ctx.clearRect(0,0,w,h);
+    flakes.forEach(function(f){
+      var x=f.x+Math.sin(f.ph)*f.amp;
+      ctx.beginPath();ctx.arc(x,f.y,f.r,0,6.283);
+      ctx.fillStyle='rgba(255,255,255,'+f.a+')';ctx.fill();
+      if(!dark){ctx.lineWidth=.7;ctx.strokeStyle='rgba(120,140,170,'+(f.a*.6).toFixed(2)+')';ctx.stroke();}
+    });
+  }
+  if(still){paint();return;}
+  function frame(ts){
+    if(!c.isConnected){crSnowRAF=null;return;}
+    var dt=last?Math.min(.05,(ts-last)/1000):0;last=ts;
+    flakes.forEach(function(f){f.y+=f.vy*dt;f.ph+=f.sp*dt;if(f.y>h+4){f.y=-4;f.x=Math.random()*w;}});
+    paint();crSnowRAF=requestAnimationFrame(frame);
+  }
+  crSnowRAF=requestAnimationFrame(frame);
+}
+/* Small static previews for the picker tiles */
+function crDecorPreview(k,p){
+  var sc=function(html,s,dy){return '<div style="transform:scale('+s+');transform-origin:50% 100%;margin-bottom:'+(dy||0)+'px">'+html+'</div>';};
+  if(k==='plant')return sc(crPlantHtml(4),.72,2);
+  if(k==='lamp')return sc(crLampHtml(p),.66,2);
+  if(k==='fire')return sc(crFireplaceHtml(p),.66,2);
+  if(k==='lights'){var d='';[['#ffcf7a',10,9],['#fff4dc',24,15],['#ffc6d2',38,18],['#d2efbe',52,15],['#ffcf7a',66,9]].forEach(function(o){d+='<span style="position:absolute;left:'+o[1]+'px;top:'+o[2]+'px;width:5px;height:7px;border-radius:50%;background:'+o[0]+';box-shadow:0 0 6px 2px '+o[0]+'aa"></span>';});
+    return '<svg viewBox="0 0 76 30" style="position:absolute;top:2px;left:0;width:76px;height:30px"><path d="M2 6 Q38 34 74 6" fill="none" stroke="'+(dark?'rgba(230,200,150,.4)':'rgba(90,64,40,.4)')+'" stroke-width="1"/></svg>'+d;}
+  if(k==='snow'){var f='';for(var i=0;i<14;i++)f+='<span style="position:absolute;left:'+((i*29)%70+3)+'px;top:'+((i*17)%46+3)+'px;width:'+(2+(i%3))+'px;height:'+(2+(i%3))+'px;border-radius:50%;background:rgba(255,255,255,'+(.5+(i%3)*.15)+')"></span>';
+    return '<div style="position:absolute;inset:0;background:linear-gradient(180deg,#1e2c4a,#3a5a9a)"></div>'+f;}
+  return '<div style="width:30px;height:30px;border-radius:50%;border:1.5px dashed var(--t3);margin-bottom:12px"></div>';
 }
 /* Bottom sheet rendered on the .shell itself (like the crisis overlay), above all scrolling content */
 function crSheet(inner,onClose){
@@ -1682,7 +1770,7 @@ function crSheet(inner,onClose){
 /* File inputs live outside the re-rendered app markup, so they are created once and never torn down */
 function crFileInput(id,accept,multiple){
   var el=Q(id);
-  if(!el){el=document.createElement('input');el.type='file';el.id=id;el.style.display='none';document.body.appendChild(el);}
+  if(!el){el=document.createElement('input');el.type='file';el.id=id;el.style.cssText='position:fixed;top:-300px;left:-300px;opacity:0;pointer-events:none;width:1px;height:1px';el.tabIndex=-1;el.setAttribute('aria-hidden','true');document.body.appendChild(el);}
   el.accept=accept;el.multiple=!!multiple;return el;
 }
 function crTodayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -1846,7 +1934,7 @@ function drawComfortScrapbook(){
     var animIn=crLastView!=='cover';crLastView='cover';
     function inA(i){return animIn?' class="cr-in" style="animation-delay:'+(i*80)+'ms"':'';} /* attributes for a dedicated wrapper */
     var glow=dark?p.glow.replace(/[\d.]+\)$/,'.45)'):'rgba(255,206,130,.55)';
-    var lightsOn=!!S.crFairyLights;
+    var decor=S.crDecor||null,lightsOn=decor==='lights';
     var quoteBg=dark?'linear-gradient(160deg,rgba(255,224,160,.12),rgba(255,224,160,0) 60%),rgba(84,62,26,.95)':'#fffaf0';
     var tornPts=[];for(var k=0;k<=20;k++)tornPts.push((k*5)+'% '+(k%2?'4px':'0'));for(var k2=20;k2>=0;k2--)tornPts.push((k2*5)+'% calc(100% - '+(k2%2?'0px':'4px')+')');
 
@@ -1854,7 +1942,7 @@ function drawComfortScrapbook(){
       '<div class="cr-stage cr-grain" style="background:'+wallTop+','+p.bg+';--crglow:'+glow+'"><div class="cr-shimmer"></div>'+
       '<div class="cr-scroll cr-room"><div style="position:relative;min-height:100%;padding:'+(lightsOn?'36px':'14px')+' 14px 18px">'+
         (lightsOn?crFairyLightsHtml():'')+
-        '<button id="cr-decor" style="position:absolute;top:'+(lightsOn?'34px':'10px')+';right:10px;z-index:3;display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;background:'+p.card+';border:1px solid '+p.bdr+';color:'+p.txt+';font-size:11px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif">✨ Decorate</button>'+
+        '<button id="cr-decor" style="position:absolute;top:'+(lightsOn?'34px':'10px')+';right:10px;z-index:3;display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;background:'+p.card+';border:1px solid '+p.bdr+';color:'+p.txt+';font-size:11px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif">✦ Decorate</button>'+
         /* companion */
         '<div'+inA(0)+'><div style="text-align:center;margin-bottom:18px">'+
           '<div id="cr-companion" role="button" tabindex="0" aria-label="'+esc(S.crMascotName)+' — tap to redecorate" style="cursor:pointer;display:inline-block">'+
@@ -1884,16 +1972,19 @@ function drawComfortScrapbook(){
           '</div></div></div>'+
         /* plant (bottom-left) + redecorate hint */
         '<div'+inA(7)+'><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:14px">'+
-          crPlantHtml(S.crPlantStage)+
+          '<div style="width:82px;flex-shrink:0;display:flex;justify-content:flex-start">'+(decor==='plant'?crPlantHtml(S.crPlantStage):'')+'</div>'+
           '<div style="flex:1;text-align:center;font-size:10px;color:'+p.txt+';opacity:.45;padding-bottom:6px">Tap '+esc(S.crMascotName||'your companion')+' to redecorate</div>'+
-          '<div style="width:56px;flex-shrink:0"></div>'+
+          '<div style="width:82px;flex-shrink:0;display:flex;justify-content:flex-end">'+(decor==='lamp'?crLampHtml(p):decor==='fire'?crFireplaceHtml(p):'')+'</div>'+
         '</div></div>'+
-      '</div></div></div>';
+      '</div></div>'+
+      (decor==='snow'?'<canvas id="cr-snow" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2"></canvas>':'')+
+      '</div>';
 
     shell(
       '<button class="bk" id="mcbk"><i class="ti ti-arrow-left" style="font-size:18px"></i>Back</button>'+
       '<span class="tbt">comfort room</span>',
       coverBody, true, true);
+    if(decor==='snow')crStartSnow();
     var sh=document.querySelector('.shell');if(sh)sh.style.background=p.bg;
     var crtb=document.querySelector('.shell .tb');if(crtb)crtb.style.background=p.bg;
     var crbk=Q('mcbk');if(crbk){crbk.style.setProperty('color',p.txt,'important');var cri=crbk.querySelector('i');if(cri)cri.style.setProperty('color',p.txt,'important');}
@@ -1910,17 +2001,22 @@ function drawComfortScrapbook(){
         '</div>',
         function(){S.crRedecoConfirm=false;drawComfortScrapbook();});
     }
-    /* Decorate sheet — small touches that don't reset anything */
+    /* Decorate picker — adds one element to the room (Redecorate is the companion tap, which resets colour/companion) */
     if(S.crDecorOpen){
+      var opts=CR_DECOR.concat([{k:'',e:'',n:'None'}]);
       crSheet(
-        '<div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">Decorate</div>'+
-        '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.5">Little touches for your room.</div>'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:var(--bg2);border:.5px solid var(--bdr);border-radius:12px;margin-bottom:10px">'+
-          '<div><div style="font-size:14px;font-weight:600;color:var(--text)">Fairy lights</div><div style="font-size:12px;color:var(--t2);margin-top:2px">A string of warm lights along the top.</div></div>'+
-          '<button id="cr-lights" class="cr-switch" role="switch" aria-checked="'+(lightsOn?'true':'false')+'" aria-label="Fairy lights" style="background:'+(lightsOn?'var(--grn)':'var(--bdr)')+'"><span style="left:'+(lightsOn?'23px':'3px')+'"></span></button>'+
-        '</div>'+
-        '<div style="font-size:12px;color:var(--t3);line-height:1.5;margin-bottom:14px">Your plant and the quote of the day are always here.</div>'+
-        '<button id="cr-decor-done" class="btn">Done</button>',
+        '<div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">Decorate your room</div>'+
+        '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.5">Pick one thing to add. You can change it anytime.</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px">'+
+          opts.map(function(o){
+            var on=(decor||'')===o.k;
+            return '<button class="cr-dtile'+(on?' on':'')+'" data-decor="'+o.k+'" aria-pressed="'+on+'">'+
+              '<div class="cr-dprev" style="background:'+p.bg+'">'+crDecorPreview(o.k,p)+'</div>'+
+              '<div style="font-size:12px;font-weight:600;color:var(--text);text-align:center;line-height:1.25">'+(o.e?o.e+' ':'')+o.n+'</div>'+
+              (o.hint?'<div style="font-size:10px;color:var(--t2);font-style:italic;text-align:center;line-height:1.2">'+o.hint+'</div>':'')+
+            '</button>';
+          }).join('')+
+        '</div>',
         function(){S.crDecorOpen=false;drawComfortScrapbook();});
     }
 
@@ -1928,8 +2024,7 @@ function drawComfortScrapbook(){
     var rdno=Q('rdno');if(rdno)rdno.onclick=function(){S.crRedecoConfirm=false;drawComfortScrapbook();};
     var rdyes=Q('rdyes');if(rdyes)rdyes.onclick=function(){S.crRedecoConfirm=false;if(sh)sh.style.background='';if(crtb)crtb.style.background='';S.crSetup=false;crLastView=null;drawComfortSetup();};
     var dec=Q('cr-decor');if(dec)dec.onclick=function(){S.crDecorOpen=true;drawComfortScrapbook();};
-    var lt=Q('cr-lights');if(lt)lt.onclick=function(){S.crFairyLights=!S.crFairyLights;saveS();crSheetAnim=false;drawComfortScrapbook();};
-    var dd=Q('cr-decor-done');if(dd)dd.onclick=function(){S.crDecorOpen=false;drawComfortScrapbook();};
+    document.querySelectorAll('[data-decor]').forEach(function(b){b.onclick=function(){S.crDecor=b.dataset.decor||null;S.crDecorOpen=false;saveS();drawComfortScrapbook();};});
 
     document.querySelectorAll('[data-crsec]').forEach(function(b){b.onclick=function(){S.crSection=parseInt(b.dataset.crsec);drawComfortScrapbook();};});
     return;
@@ -1947,7 +2042,7 @@ function drawComfortScrapbook(){
       '<div style="display:flex;flex-wrap:wrap;justify-content:center">'+S.crPhotos.map(polaroid).join('')+'</div>':
       '<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:30px 20px 10px">The walls are bare for now. Add a photo of someone or somewhere that feels like home.</div>')+
       '<div style="margin-top:16px;border-top:1px dashed '+p.bdr+';padding-top:14px">'+
-        '<label for="cr-photo-input" id="cr-addphoto" role="button" tabindex="0" style="display:block;width:100%;padding:10px;background:none;border:1.5px dashed '+p.bdr+';border-radius:12px;font-size:13px;color:'+p.accent+';cursor:pointer;font-family:\'DM Sans\',sans-serif;text-align:center">+ Add photos or videos</label>'+
+        '<button id="cr-addphoto" style="display:block;width:100%;padding:10px;background:none;border:1.5px dashed '+p.bdr+';border-radius:12px;font-size:13px;color:'+p.accent+';cursor:pointer;font-family:\'DM Sans\',sans-serif">+ Add photos or videos</button>'+
       '</div>'+
     '</div>',
 
@@ -2045,8 +2140,9 @@ function drawComfortScrapbook(){
   var crtit=crtb&&crtb.querySelector('span');if(crtit)crtit.style.color=p.txt;
   Q('mcbk').onclick=function(){if(sh)sh.style.background='';if(crtb)crtb.style.background='';S.crSection=null;S.crRedecoConfirm=false;voiceMsg=null;drawComfortScrapbook();};
 
+  /* The input is created once and never removed; each Memories render only re-binds its handler. */
   var photoIn=crFileInput('cr-photo-input','image/*,image/heic,image/heif,video/mp4,video/quicktime',true);
-  photoIn.onchange=function(e){
+  if(page===0)photoIn.onchange=function(e){
       var files=Array.from(e.target.files||[]);e.target.value='';if(!files.length)return;
       var processed=0,total=files.length;
       files.forEach(function(file,fi2){
@@ -2105,7 +2201,7 @@ function drawComfortScrapbook(){
         }
       });
   };
-  var addPh=Q('cr-addphoto');if(addPh)addPh.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();photoIn.click();}};
+  var addPh=Q('cr-addphoto');if(addPh)addPh.onclick=function(){document.getElementById('cr-photo-input').click();};
 
   document.querySelectorAll('[data-phview]').forEach(function(d){d.onclick=function(){
     var idx=parseInt(d.dataset.phview),ph=S.crPhotos[idx];if(!ph)return;
@@ -2255,12 +2351,12 @@ function draw(){
   var screens={mood:drawMood,calm:drawCalm,support:drawSupport,mycorner:drawMyCorner,wins:function(){S.myCornerTab='wins';drawMyCorner();},me:drawMe,wcs:drawWCS,'game-doodle':initDoodle,'game-ball':initBall,'game-bubble':initBubble,'game-stars':initStars,'game-firefly':initFirefly,'game-colorfill':initColorFill,'game-sand':initSand,'game-stonestack':initStoneStack,'game-breathbubble':initBreathBubble,comfort:function(){S.myCornerTab='comfort';drawMyCorner();},venthistory:drawVentHistory,doodlegallery:drawDoodleGallery};
   var fn=screens[S.scr];if(fn)fn();else{S.scr='mood';drawMood();}
 }
-/* Comfort Room plant: grows one stage (max 5) for each day the app is opened; back to stage 1 after 7 days away. */
+/* Comfort Room plant: grows one stage (max 5) for each day the app is opened; after 7+ days away it drops back one stage (never below 1). */
 function crTickPlant(){
   var t=crTodayStr(),last=S.crPlantLastSeen;
   if(last===t)return;
   if(!last||!S.crPlantStage){S.crPlantStage=1;}
-  else{var d=Math.round((new Date(t+'T12:00:00')-new Date(last+'T12:00:00'))/864e5);if(d>=7)S.crPlantStage=1;else if(d>0)S.crPlantStage=Math.min(5,S.crPlantStage+1);}
+  else{var d=Math.round((new Date(t+'T12:00:00')-new Date(last+'T12:00:00'))/864e5);if(d>=7)S.crPlantStage=Math.max(1,S.crPlantStage-1);else if(d>0)S.crPlantStage=Math.min(5,S.crPlantStage+1);}
   S.crPlantLastSeen=t;saveS();
 }
 loadS();crTickPlant();draw();checkDailyNotif();setInterval(function(){checkDailyNotif();crTickPlant();},60000);
