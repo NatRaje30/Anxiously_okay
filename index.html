@@ -10,10 +10,11 @@
 <meta name="theme-color" content="#fffbf5" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1a1208" media="(prefers-color-scheme: dark)">
 <title>Anxiously Okay</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500&family=Caveat:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
+button,input,textarea,select{font-family:inherit}
 body{background:#b0c0a8;display:flex;justify-content:center;padding:10px;min-height:100vh}
 #root{width:360px}
 .shell{width:360px;height:620px;border-radius:26px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.2);display:flex;flex-direction:column;position:relative;font-family:'DM Sans',sans-serif;
@@ -125,6 +126,7 @@ canvas{display:block;touch-action:none}
 .cr-dtile:active{transform:scale(.96)}
 .cr-dtile.on{border:2px solid var(--grn);background:var(--gbg)}
 .cr-dprev{position:relative;width:76px;height:54px;border-radius:10px;overflow:hidden;display:flex;align-items:flex-end;justify-content:center}
+.cr-deco{pointer-events:none!important}
 .cr-sheet-ov{position:absolute;inset:0;background:rgba(0,0,0,.42);display:flex;align-items:flex-end;z-index:120}
 .cr-sheet{background:var(--bg);border-radius:20px 20px 0 0;padding:20px 18px 24px;width:100%;box-shadow:0 -4px 20px rgba(0,0,0,.15)}
 .cr-sheet-ov.anim{animation:crFade .25s ease}.cr-sheet-ov.anim .cr-sheet{animation:crUp .3s ease}
@@ -146,6 +148,7 @@ canvas{display:block;touch-action:none}
 .cr-obj:hover{filter:brightness(1.03)}
 .cr-obj:active{transform:scale(.95)!important}
 .cr-obj:focus-visible,#cr-companion:focus-visible{outline:2px dashed currentColor;outline-offset:4px}
+#cr-photo-input:focus-visible+label{outline:2px solid var(--grn);outline-offset:2px}
 .cr-clamp{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
 .cr-room::-webkit-scrollbar{display:none}
 @media (prefers-reduced-motion:reduce){.cr-mascot,.aff-sway,.cr-shimmer,.cr-in,.cr-sec-in,.cr-light,.cr-plant-sway,.cr-lamp-glow,.cr-fire-glow,.cr-flame,.cr-sheet-ov,.cr-sheet,.mc-pulse,.mc-fade,.mc-in{animation:none!important}}
@@ -221,7 +224,17 @@ var voiceMsg=null; /* {ok:bool,text:string} — banner on the Voices page */
 var VOICE_MAX_SEC=60,VOICE_MAX_UPLOAD=3*1024*1024,AO_STORE_LIMIT=4.8e6;
 var AO_PERSIST=['name','dob','ob','obPath','moodHist','streak','jlog','ventLog','wcsLog','unsentDrawer','tricks','customTricks','crSetup','crColor','crMascot','crMascotName','crPhotos','crAffirmations','crSongs','crNotes','crVoices','doodleGallery','crFairyLights','crDecor','crPlantStage','crPlantLastSeen','emergContact','notifEnabled','notifTime','lastNotifDate','lastSupNotifDate'];
 function aoSerialize(){var d={};AO_PERSIST.forEach(function(k){d[k]=S[k];});if(d.crPhotos)d.crPhotos=d.crPhotos.map(function(ph){var c=Object.assign({},ph);delete c.videoUrl;return c;});return JSON.stringify(d);}
-function saveS(){try{localStorage.setItem('ao_s',aoSerialize());}catch(e){try{localStorage.removeItem('ao_s');localStorage.setItem('ao_s',aoSerialize());}catch(e2){}}}
+/* Persist state. On failure nothing already saved is touched (the old fallback deleted everything and retried). */
+function aoIsQuota(e){return !!e&&(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED'||e.code===22||e.code===1014);}
+function aoPersist(){try{localStorage.setItem('ao_s',aoSerialize());return {ok:true};}catch(e){return {ok:false,quota:aoIsQuota(e)};}}
+var aoToastAt=0;
+function aoToast(text){
+  var sh=Q('msh');if(!sh||Date.now()-aoToastAt<4000)return;aoToastAt=Date.now();
+  var t=document.createElement('div');t.setAttribute('role','status');
+  t.style.cssText='position:absolute;left:12px;right:12px;top:56px;z-index:130;background:var(--sos);border:1.5px solid var(--sosbdr);color:var(--sosh);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.45;box-shadow:0 4px 14px rgba(0,0,0,.12)';
+  t.textContent=text;sh.appendChild(t);setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},4500);
+}
+function saveS(){var r=aoPersist();if(!r.ok&&r.quota)aoToast('Your room is full. Delete a few photos to add more.');return r.ok;}
 function loadS(){try{var d=localStorage.getItem('ao_s');if(d){var p=JSON.parse(d);AO_PERSIST.forEach(function(k){if(p[k]!==undefined)S[k]=p[k];});if(p.crDecor===undefined&&p.crSetup)S.crDecor=p.crFairyLights?'lights':'plant';if(S.crPhotos){var dirty=false;S.crPhotos.forEach(function(ph){if(ph.videoUrl){delete ph.videoUrl;dirty=true;}});if(dirty){try{localStorage.removeItem('ao_s');}catch(e){}saveS();}}}}catch(e){}}
 function Q(id){return document.getElementById(id);}
 function fmtVoiceSecs(n){return Math.floor(n/60)+':'+String(n%60).padStart(2,'0');}
@@ -1629,6 +1642,114 @@ function drawMyCornerUnsent(){
 }
 
 /* ── COMFORT ROOM ── */
+var aoInFrame=(function(){try{return window.self!==window.top;}catch(e){return true;}})();
+var CR_VIDEO_MAX=50*1024*1024;
+var crPhotoMsg=null,crPhotoMsgTimer=null; /* {ok,text} banner on the Memories page */
+function crOnMemories(){return (S.scr==='mycorner'||S.scr==='comfort')&&S.myCornerTab==='comfort'&&S.crSection===0;}
+function crSetPhotoMsg(ok,text,autoHide){
+  crPhotoMsg={ok:ok,text:text};
+  if(crPhotoMsgTimer){clearTimeout(crPhotoMsgTimer);crPhotoMsgTimer=null;}
+  if(autoHide)crPhotoMsgTimer=setTimeout(function(){crPhotoMsg=null;crPhotoMsgTimer=null;if(crOnMemories())drawComfortScrapbook();},4000);
+  if(crOnMemories())drawComfortScrapbook();
+}
+function crFrameNote(){return aoInFrame?'<div style="font-size:12px;color:var(--t2);background:var(--bg2);border:.5px solid var(--bdr);border-radius:10px;padding:8px 10px;margin:0 4px 12px;line-height:1.45">Uploading may be limited in this preview. Open the app in your browser for the full experience.</div>':'';}
+function crPhotoMsgHtml(){
+  if(!crPhotoMsg)return '';
+  return '<div role="status" style="display:flex;align-items:flex-start;gap:8px;border-radius:12px;padding:10px 12px;margin:0 4px 12px;font-size:13px;line-height:1.45;'+
+    (crPhotoMsg.ok?'background:var(--gbg);border:1.5px solid var(--gbdr);color:var(--gt)':'background:var(--sos);border:1.5px solid var(--sosbdr);color:var(--sosh)')+'">'+
+    '<span aria-hidden="true">'+(crPhotoMsg.ok?'✓':'!')+'</span><span>'+esc(crPhotoMsg.text)+'</span></div>';
+}
+function crIsVideo(f){return /^video\//.test(f.type||'')||/\.(mp4|mov|m4v|webm|3gp)$/i.test(f.name||'');}
+/* Reads, compresses and stores picked files. Each file reports back exactly once; nothing is shown
+   until it has actually been saved, and every failure ends in a visible message. */
+function handleCrFiles(fileList){
+  var files=Array.prototype.slice.call(fileList||[]);if(!files.length)return;
+  var results=new Array(files.length),done=0,failed=0,tooBig=0;
+  crSetPhotoMsg(true,'Adding '+(files.length===1?'your memory':files.length+' memories')+'…',false);
+  function finish(i,entry,why){
+    if(results[i]!==undefined)return;
+    results[i]=entry||null;if(!entry){if(why==='big')tooBig++;else failed++;}
+    if(++done===files.length)commit();
+  }
+  function commit(){
+    var entries=results.filter(Boolean);
+    for(var k=0;k<entries.length;k++)S.crPhotos.unshift(entries[k]);
+    if(entries.length){
+      var r=aoPersist();
+      if(!r.ok){
+        S.crPhotos.splice(0,entries.length);
+        entries.forEach(function(e){if(videoCache[e.id]){URL.revokeObjectURL(videoCache[e.id]);delete videoCache[e.id];}});
+        crSetPhotoMsg(false,r.quota?'Your room is full. Delete a few photos to add more.':'Your memories can\'t be saved here. Open the app in your browser to keep them.',false);
+        return;
+      }
+    }
+    var msg=entries.length?'Added '+entries.length+(entries.length===1?' memory.':' memories.'):'';
+    if(tooBig)msg+=(msg?' ':'')+(tooBig===1?'One video is over 50 MB, so it wasn\'t added.':tooBig+' videos are over 50 MB, so they weren\'t added.');
+    if(failed)msg+=(msg?' ':'')+(failed===1?'One of those couldn\'t be added. Try a different file.':failed+' of those couldn\'t be added. Try different files.');
+    if((S.scr==='mycorner'||S.scr==='comfort')&&S.myCornerTab==='comfort')S.crSection=0;
+    crSetPhotoMsg(!(failed||tooBig),msg,!(failed||tooBig));
+  }
+  files.forEach(function(file,i){
+    try{
+      if(crIsVideo(file)){
+        if(file.size>CR_VIDEO_MAX){finish(i,null,'big');return;}
+        var vid=document.createElement('video');
+        vid.preload='auto';vid.muted=true;vid.playsInline=true;vid.setAttribute('playsinline','');
+        var objUrl=URL.createObjectURL(file);
+        vid.src=objUrl;
+        var vidId=Date.now()+i;
+        var thumbDone=false;
+        var captureThumb=function(){
+          if(thumbDone)return;thumbDone=true;
+          var thumbUrl='';
+          try{
+            if(vid.videoWidth){
+              var vw=vid.videoWidth,vh=vid.videoHeight||240;
+              var cvs=document.createElement('canvas');
+              cvs.width=Math.min(300,vw);cvs.height=Math.round(cvs.width*vh/Math.max(vw,1));
+              cvs.getContext('2d').drawImage(vid,0,0,cvs.width,cvs.height);
+              thumbUrl=cvs.toDataURL('image/jpeg',.72);
+            }
+          }catch(e){}
+          videoCache[vidId]=objUrl;
+          finish(i,{id:vidId,url:thumbUrl,isVideo:true});
+        };
+        vid.onloadeddata=function(){setTimeout(captureThumb,400);};
+        vid.onseeked=function(){setTimeout(captureThumb,100);};
+        vid.onerror=function(){if(!thumbDone){thumbDone=true;URL.revokeObjectURL(objUrl);finish(i,{id:vidId,url:'',isVideo:true});}};
+        /* iOS may never load data for an off-screen video: fall back after 6s rather than hang */
+        setTimeout(captureThumb,6000);
+        vid.currentTime=0;
+        vid.load();
+      } else {
+        var reader=new FileReader();
+        reader.onerror=function(){finish(i,null);};
+        reader.onload=function(ev){
+          var rawUrl=ev.target.result;
+          var img=new Image();
+          img.onload=function(){
+            try{
+              var cvs=document.createElement('canvas');
+              var maxW=600,maxH=600,ratio=Math.min(maxW/img.width,maxH/img.height,1);
+              cvs.width=Math.round(img.width*ratio);cvs.height=Math.round(img.height*ratio);
+              cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);
+              finish(i,{id:Date.now()+i,url:cvs.toDataURL('image/jpeg',.72)});
+            }catch(e){
+              finish(i,{id:Date.now()+i,url:rawUrl});
+            }
+          };
+          img.onerror=function(){finish(i,null);}; /* this browser can't read the image: say so instead of saving a broken one */
+          img.src=rawUrl;
+        };
+        reader.readAsDataURL(file);
+      }
+    }catch(err){finish(i,null);}
+  });
+}
+/* One delegated listener, added once: keeps working across every re-render of the Memories page */
+document.addEventListener('change',function(e){
+  if(e.target&&e.target.id==='cr-photo-input'){handleCrFiles(e.target.files);e.target.value='';}
+});
 var CR_QUOTES=[
  'The kettle doesn\'t rush. It just gets warm, and then it sings.',
  'Somewhere, someone is reading by a window and the light is just right.',
@@ -1672,7 +1793,7 @@ function crFairyLightsHtml(){
     var dur=(2+((i*7)%11)/5.5).toFixed(2); /* 2–4s, uneven */
     h+='<span class="cr-light" style="left:calc('+(t*100).toFixed(2)+'% - 3px);top:'+(y+1).toFixed(1)+'px;background:'+c+';box-shadow:0 0 7px 2px '+c+'aa;animation-duration:'+dur+'s;animation-delay:-'+(i*.61).toFixed(2)+'s"></span>';
   }
-  return '<div aria-hidden="true" style="position:absolute;top:0;left:6px;right:6px;height:32px;pointer-events:none">'+
+  return '<div class="cr-deco" aria-hidden="true" style="position:absolute;top:0;left:6px;right:6px;height:32px;pointer-events:none;z-index:0">'+
     '<svg viewBox="0 0 100 30" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible"><path d="M0 4 Q50 34 100 4" fill="none" stroke="'+(dark?'rgba(230,200,150,.35)':'rgba(90,64,40,.4)')+'" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>'+h+'</div>';
 }
 /* Little plant in a terracotta pot, stages 1 (sprout) to 5 (five leaves) */
@@ -1685,7 +1806,7 @@ function crPlantHtml(stage){
     var w=(13*l[2]).toFixed(1),hh=(6.5*l[2]).toFixed(1),bt=18+l[0],left=l[1]<0;
     return '<span style="position:absolute;bottom:'+bt+'px;'+(left?'left:calc(28px - '+w+'px)':'left:29px')+';width:'+w+'px;height:'+hh+'px;background:linear-gradient('+(left?'200deg':'160deg')+','+g1+','+g2+');border-radius:'+(left?'100% 0 100% 0':'0 100% 0 100%')+';transform:rotate('+(left?'-30deg':'30deg')+');transform-origin:'+(left?'100% 50%':'0 50%')+'"></span>';
   }).join('');
-  return '<div role="img" aria-label="A little plant" title="A little plant" style="position:relative;width:56px;height:64px;flex-shrink:0">'+
+  return '<div class="cr-deco" role="img" aria-label="A little plant" title="A little plant" style="pointer-events:none;position:relative;width:56px;height:64px;flex-shrink:0">'+
     '<div class="cr-plant-sway"><span style="position:absolute;bottom:18px;left:27.5px;width:2px;height:'+stem+'px;background:'+g2+';border-radius:1px"></span>'+leaves+'</div>'+
     '<span style="position:absolute;bottom:15px;left:11px;width:34px;height:5px;background:linear-gradient(180deg,#c26a40,#9c5434);border-radius:2px"></span>'+
     '<span style="position:absolute;bottom:0;left:13px;width:30px;height:16px;background:linear-gradient(90deg,#b8653e,#d4855a 45%,#b0603a);clip-path:polygon(0 0,100% 0,85% 100%,15% 100%)"></span>'+
@@ -1694,7 +1815,7 @@ function crPlantHtml(stage){
 /* Bedside lamp — shade in the room's accent colour, softly pulsing glow */
 function crLampHtml(p){
   var ga=dark?.55:.38;
-  return '<div role="img" aria-label="A small lamp" title="A small lamp" style="position:relative;width:64px;height:74px;flex-shrink:0">'+
+  return '<div class="cr-deco" role="img" aria-label="A small lamp" title="A small lamp" style="pointer-events:none;position:relative;width:64px;height:74px;flex-shrink:0">'+
     '<div class="cr-lamp-glow" style="left:-18px;top:-14px;width:100px;height:90px;background:radial-gradient(circle at 50% 42%,rgba(255,206,120,'+ga+'),rgba(255,206,120,0) 65%)"></div>'+
     '<span style="position:absolute;left:24px;top:30px;width:16px;height:9px;border-radius:50%;background:radial-gradient(circle,#fff6d8,#ffd98a 70%,rgba(255,217,138,0))"></span>'+
     '<span style="position:absolute;left:13px;top:10px;width:38px;height:24px;background:linear-gradient(90deg,'+p.accent+'cc,'+p.accent+' 50%,'+p.accent+'bb);clip-path:polygon(22% 0,78% 0,100% 100%,0 100%);border-radius:2px"></span>'+
@@ -1706,7 +1827,7 @@ function crLampHtml(p){
 function crFireplaceHtml(p){
   var stone=dark?'linear-gradient(180deg,#6f5f4f,#5a4c3f)':'linear-gradient(180deg,#cdb89c,#b6a084)';
   var ga=dark?.5:.35;
-  return '<div role="img" aria-label="A small fireplace" title="A small fireplace" style="position:relative;width:80px;height:70px;flex-shrink:0">'+
+  return '<div class="cr-deco" role="img" aria-label="A small fireplace" title="A small fireplace" style="pointer-events:none;position:relative;width:80px;height:70px;flex-shrink:0">'+
     '<div class="cr-fire-glow" style="left:-14px;top:4px;width:108px;height:84px;background:radial-gradient(circle at 50% 66%,rgba(255,150,60,'+ga+'),rgba(255,150,60,0) 62%)"></div>'+
     '<span style="position:absolute;left:0;top:6px;width:80px;height:7px;border-radius:2px;background:linear-gradient(180deg,'+p.floor+','+p.floor+'cc);box-shadow:0 2px 3px rgba(0,0,0,.2)"></span>'+
     '<span style="position:absolute;left:6px;top:13px;width:68px;height:57px;background:'+stone+';border-radius:2px 2px 0 0"></span>'+
@@ -1787,12 +1908,12 @@ function drawComfortSetup(){
   shell('<button class="bk" id="crbk"><i class="ti ti-arrow-left" style="font-size:18px"></i>Back</button><span class="tbt">comfort room</span>',
     '<div class="serif" style="font-size:21px;color:var(--text);margin-top:4px;margin-bottom:3px">Set up your <em>Comfort Room</em></div>'+
     '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:18px;line-height:1.5">Pick a colour for the walls and someone to keep you company.</div>'+
-    '<div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Room colour</div>'+
+    '<div style="font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Room colour</div>'+
     '<div style="display:flex;gap:6px;margin-bottom:18px">'+colorSwatches+'</div>'+
-    '<div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Your companion</div>'+
+    '<div style="font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Your companion</div>'+
     '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">'+mascotCards+'</div>'+
     (S.crMascot?
-      '<div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Name your '+CR_MASCOTS.find(function(m){return m.id===S.crMascot;}).name.toLowerCase()+'</div>'+
+      '<div style="font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Name your '+CR_MASCOTS.find(function(m){return m.id===S.crMascot;}).name.toLowerCase()+'</div>'+
       '<input class="inp" id="cr-name" placeholder="What shall we call them?" maxlength="20" value="'+esc(S.crMascotName)+'">'+
       '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;margin-top:4px">Up to 20 letters. You can change it anytime.</div>'
     :'')+
@@ -1814,6 +1935,7 @@ function drawComfort(){
 function drawComfortScrapbook(){
   var p=CR_PALETTES[S.crColor]||CR_PALETTES.amber;
   if(dark)p=Object.assign({},p,{bg:p.bgD,card:p.cardD,txt:p.txtD,bdr:p.bdrD,accent:p.accentD});
+  p=Object.assign({},p,{txt:'var(--text)'}); /* type uses the app's tokens; the palette tints backgrounds, cards and accents only */
   var mascot=CR_MASCOTS.find(function(m){return m.id===S.crMascot;})||CR_MASCOTS[0];
 
   function polaroid(ph,i){
@@ -1834,7 +1956,7 @@ function drawComfortScrapbook(){
     var bg=dark?
       'linear-gradient(160deg,rgba(255,224,160,.14),rgba(255,224,160,0) 60%),'+(i%3===0?'rgba(92,68,26,.92)':i%3===1?'rgba(94,56,42,.92)':'rgba(70,72,36,.92)'):
       (i%3===0?'#fefce4':i%3===1?'#fef0f0':'#f0fef4');
-    var affTxt=dark?'#f6e6c6':p.txt;
+    var affTxt='var(--text)';
     var delay=(i*1.3)%6;
     return '<div class="aff-sway" style="--aff-rot:'+rot+'deg;position:relative;background:'+bg+';border-radius:3px;padding:14px 14px 24px;box-shadow:'+(dark?'0 0 0 1px rgba(255,214,150,.10),0 0 18px rgba(240,170,70,.10),1px 3px 10px rgba(0,0,0,.35)':'1px 2px 8px rgba(0,0,0,.1)')+';animation-delay:-'+delay+'s;animation-duration:'+(5+i%3)+'s;margin-bottom:14px">'+
       '<div style="position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;background:#c0a0a0;box-shadow:0 1px 3px rgba(0,0,0,.25)"></div>'+
@@ -1861,12 +1983,12 @@ function drawComfortScrapbook(){
   function envelope(n,i,isOpen){
     var envBg=dark?p.card:'rgba(255,255,255,.88)';
     var sealBg=dark?'linear-gradient(160deg,rgba(60,42,10,.8),rgba(50,34,6,.8))':'linear-gradient(160deg,#ede0c4,#dfd0a8)';
-    var sealTxt=dark?p.txt:'#5a3c0a';
-    var sealSub=dark?p.txt+'99':'#7a5830';
+    var sealTxt='var(--text)';
+    var sealSub='var(--t2)';
     var sealDel=dark?'rgba(180,140,80,.6)':'rgba(90,60,10,.6)';
     if(isOpen){
       return '<div style="position:relative;background:'+envBg+';border-radius:5px;padding:12px 28px 12px 12px;margin-bottom:12px;box-shadow:1px 2px 6px rgba(0,0,0,'+(dark?'.35':'.1')+')">'+
-        '<div style="font-size:9px;font-weight:600;color:'+p.accent+';letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Opened</div>'+
+        '<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:'+p.accent+';margin-bottom:4px">Opened</div>'+
         '<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';line-height:1.6;white-space:pre-wrap">'+esc(n.text)+'</div>'+
         '<button data-notedel="'+i+'" style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px">&#215;</button>'+
       '</div>';
@@ -1875,8 +1997,8 @@ function drawComfortScrapbook(){
         '<div style="background:'+sealBg+';border-radius:6px;padding:14px 28px 14px 14px;box-shadow:1px 2px 8px rgba(0,0,0,'+(dark?'.4':'.12')+')">'+
           '<div style="position:absolute;top:0;left:0;right:0;height:44%;background:linear-gradient(135deg,'+(dark?'rgba(80,60,20,.4)':'#cfc0a0')+' 50%,transparent 50%);border-radius:6px 6px 0 0;opacity:.5"></div>'+
           '<div style="position:absolute;top:calc(44% - 11px);left:50%;transform:translateX(-50%);width:22px;height:22px;background:'+p.accent+';border-radius:50%;opacity:.85"></div>'+
-          '<div style="margin-top:28px"><div class="serif" style="font-size:12px;font-style:italic;color:'+sealTxt+';opacity:.8">A sealed note</div>'+
-            '<div style="font-size:10px;color:'+sealSub+';margin-top:3px">Opens '+esc(n.openDate)+'</div></div>'+
+          '<div style="margin-top:28px"><div class="serif" style="font-size:13px;font-style:italic;color:'+sealTxt+'">A sealed note</div>'+
+            '<div style="font-size:11px;color:'+sealSub+';margin-top:3px">Opens '+esc(n.openDate)+'</div></div>'+
           '<button data-notedel="'+i+'" style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;color:'+sealDel+';font-size:16px">&#215;</button>'+
         '</div>'+
       '</div>';
@@ -1893,23 +2015,23 @@ function drawComfortScrapbook(){
     var hello=hr<5?'Can\'t sleep? Stay a while.':hr<12?'Morning. Make yourself at home.':hr<17?'Come in. Take a breath.':'Welcome back. Stay as long as you like.';
     var wallTop=dark?'radial-gradient(130% 55% at 50% 0%,'+p.glow.replace(/[\d.]+\)$/,'.32)')+',transparent 70%)':'radial-gradient(130% 55% at 50% 0%,rgba(255,250,235,.9),transparent 70%),linear-gradient(180deg,'+p.wall+'66 0%,'+p.bg+' 72%)';
     var noteBg=dark?'linear-gradient(160deg,rgba(255,224,160,.14),rgba(255,224,160,0) 60%),rgba(92,68,26,.92)':'#fefce4';
-    var noteTxt=dark?'#f6e6c6':p.txt;
-    var lbl='font-family:\'Caveat\',cursive;font-size:18px;line-height:1;color:'+p.txt+';display:block;margin-top:6px';
+    var noteTxt='var(--text)';
+    var lbl='font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;line-height:1;color:var(--t2);display:block;margin-top:6px';
 
     var polaroidObj='<button class="cr-obj" data-crsec="0" aria-label="Memories" style="transform:rotate(-4deg)">'+
       '<div style="position:relative;background:'+(dark?'#f2eadb':'#fff')+';padding:7px 7px 24px;box-shadow:2px 4px 12px rgba(0,0,0,'+(dark?'.5':'.18')+');border-radius:2px">'+
         '<div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%) rotate(3deg);width:44px;height:15px;background:'+p.wall+';opacity:.75"></div>'+
         (firstPhoto?'<img src="'+firstPhoto.url+'" alt="" style="width:96px;height:96px;object-fit:cover;display:block">':
-          '<div style="width:96px;height:96px;border:1.5px dashed #c8b8a0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#8a7458"><span style="font-size:26px">&#128248;</span><span style="font-family:\'Caveat\',cursive;font-size:15px">add a photo</span></div>')+
-        '<span style="position:absolute;left:0;right:0;bottom:3px;text-align:center;font-family:\'Caveat\',cursive;font-size:17px;color:#4a3a28">Memories</span>'+
+          '<div style="width:96px;height:96px;border:1.5px dashed #c8b8a0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#8a7458"><span style="font-size:26px">&#128248;</span><span style="font-size:11px">add a photo</span></div>')+
+        '<span style="position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:#4a3a28">Memories</span>'+
       '</div></button>';
 
     var noteObj='<button class="cr-obj" data-crsec="1" aria-label="Affirmations" style="transform:rotate(3deg)">'+
       '<div style="position:relative;width:122px;min-height:118px;background:'+noteBg+';padding:16px 10px 10px;box-shadow:1px 3px 10px rgba(0,0,0,'+(dark?'.45':'.13')+');border-radius:2px;text-align:left;display:flex;flex-direction:column">'+
         '<div style="position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:13px;height:13px;border-radius:50%;background:'+p.accent+';box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>'+
         (firstAff?'<div class="serif cr-clamp" style="font-size:12.5px;font-style:italic;color:'+noteTxt+';line-height:1.45;flex:1">'+esc(firstAff.text)+'</div>':
-          '<div style="flex:1;display:flex;align-items:center;justify-content:center;font-family:\'Caveat\',cursive;font-size:16px;color:'+noteTxt+';opacity:.7;text-align:center">pin up something kind</div>')+
-        '<div style="font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:'+noteTxt+';opacity:.55;margin-top:6px">Affirmations</div>'+
+          '<div style="flex:1;display:flex;align-items:center;justify-content:center;font-family:\'DM Serif Display\',serif;font-style:italic;font-size:13px;color:var(--t2);text-align:center">pin up something kind</div>')+
+        '<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--t2);margin-top:6px">Affirmations</div>'+
       '</div></button>';
 
     var recordObj='<button class="cr-obj" data-crsec="2" aria-label="Songs">'+
@@ -1939,17 +2061,19 @@ function drawComfortScrapbook(){
     var tornPts=[];for(var k=0;k<=20;k++)tornPts.push((k*5)+'% '+(k%2?'4px':'0'));for(var k2=20;k2>=0;k2--)tornPts.push((k2*5)+'% calc(100% - '+(k2%2?'0px':'4px')+')');
 
     var coverBody=
-      '<div class="cr-stage cr-grain" style="background:'+wallTop+','+p.bg+';--crglow:'+glow+'"><div class="cr-shimmer"></div>'+
+      '<div class="cr-stage cr-grain" style="background:'+wallTop+','+p.bg+';--crglow:'+glow+'"><div class="cr-shimmer cr-deco"></div>'+
       '<div class="cr-scroll cr-room"><div style="position:relative;min-height:100%;padding:'+(lightsOn?'36px':'14px')+' 14px 18px">'+
         (lightsOn?crFairyLightsHtml():'')+
-        '<button id="cr-decor" style="position:absolute;top:'+(lightsOn?'34px':'10px')+';right:10px;z-index:3;display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;background:'+p.card+';border:1px solid '+p.bdr+';color:'+p.txt+';font-size:11px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif">✦ Decorate</button>'+
+        '<div style="position:relative;z-index:1">'+
+        '<button id="cr-decor" style="position:absolute;top:'+(lightsOn?'34px':'10px')+';right:10px;z-index:3;display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;background:'+p.card+';border:1px solid '+p.bdr+';color:var(--text);font-size:13px;font-weight:500;cursor:pointer">✦ Decorate</button>'+
         /* companion */
         '<div'+inA(0)+'><div style="text-align:center;margin-bottom:18px">'+
           '<div id="cr-companion" role="button" tabindex="0" aria-label="'+esc(S.crMascotName)+' — tap to redecorate" style="cursor:pointer;display:inline-block">'+
             '<span class="cr-mascot" style="font-size:64px;display:block;line-height:1.05;filter:drop-shadow(0 6px 10px rgba(0,0,0,'+(dark?'.4':'.12')+'))">'+mascot.e+'</span>'+
-            '<div style="font-family:\'Caveat\',cursive;font-size:22px;color:'+p.txt+';margin-top:4px">'+esc(S.crMascotName)+'</div>'+
+            '<div style="font-size:13px;font-weight:500;color:var(--text);margin-top:4px">'+esc(S.crMascotName)+'</div>'+
           '</div>'+
-          '<div class="serif" style="font-size:14px;font-style:italic;color:'+p.txt+';opacity:.8;margin-top:2px">'+hello+'</div>'+
+          '<div class="serif" style="font-size:21px;color:var(--text);margin-top:10px">Your <em>Comfort Room</em></div>'+
+          '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-top:2px;line-height:1.5">'+hello+'</div>'+
         '</div></div>'+
         /* wall */
         '<div style="display:flex;justify-content:center;align-items:flex-start;gap:22px;margin-bottom:26px">'+
@@ -1967,17 +2091,18 @@ function drawComfortScrapbook(){
         /* quote of the day — torn paper */
         '<div'+inA(6)+'><div style="margin:24px 8px 0;filter:drop-shadow(1px 3px 5px rgba(0,0,0,'+(dark?'.45':'.12')+'))">'+
           '<div style="background:'+quoteBg+';padding:16px 18px 15px;transform:rotate(-1deg);clip-path:polygon('+tornPts.join(',')+')">'+
-            '<div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:'+(dark?'#f6e6c6':p.txt)+';opacity:.5;margin-bottom:5px">For today</div>'+
-            '<div class="serif" style="font-size:14px;font-style:italic;line-height:1.55;color:'+(dark?'#f6e6c6':p.txt)+'">'+esc(crQuoteOfDay())+'</div>'+
+            '<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--t2);margin-bottom:5px">For today</div>'+
+            '<div class="serif" style="font-size:14px;font-style:italic;line-height:1.55;color:var(--text)">'+esc(crQuoteOfDay())+'</div>'+
           '</div></div></div>'+
         /* plant (bottom-left) + redecorate hint */
         '<div'+inA(7)+'><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:14px">'+
           '<div style="width:82px;flex-shrink:0;display:flex;justify-content:flex-start">'+(decor==='plant'?crPlantHtml(S.crPlantStage):'')+'</div>'+
-          '<div style="flex:1;text-align:center;font-size:10px;color:'+p.txt+';opacity:.45;padding-bottom:6px">Tap '+esc(S.crMascotName||'your companion')+' to redecorate</div>'+
+          '<div style="flex:1;text-align:center;font-size:11px;color:var(--t3);padding-bottom:6px">Tap '+esc(S.crMascotName||'your companion')+' to redecorate</div>'+
           '<div style="width:82px;flex-shrink:0;display:flex;justify-content:flex-end">'+(decor==='lamp'?crLampHtml(p):decor==='fire'?crFireplaceHtml(p):'')+'</div>'+
         '</div></div>'+
+        '</div>'+
       '</div></div>'+
-      (decor==='snow'?'<canvas id="cr-snow" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2"></canvas>':'')+
+      (decor==='snow'?'<canvas id="cr-snow" class="cr-deco" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0"></canvas>':'')+
       '</div>';
 
     shell(
@@ -1987,7 +2112,6 @@ function drawComfortScrapbook(){
     if(decor==='snow')crStartSnow();
     var sh=document.querySelector('.shell');if(sh)sh.style.background=p.bg;
     var crtb=document.querySelector('.shell .tb');if(crtb)crtb.style.background=p.bg;
-    var crbk=Q('mcbk');if(crbk){crbk.style.setProperty('color',p.txt,'important');var cri=crbk.querySelector('i');if(cri)cri.style.setProperty('color',p.txt,'important');}
     Q('mcbk').onclick=function(){if(sh)sh.style.background='';if(crtb)crtb.style.background='';S.crRedecoConfirm=false;S.crDecorOpen=false;S.myCornerTab=null;go('mycorner');};
 
     /* Redecorate confirmation — an overlay on the shell, never inside the scrolling room */
@@ -2034,27 +2158,30 @@ function drawComfortScrapbook(){
   var page=S.crSection||0;
   var secAnim=crLastView!=='sec'+page;crLastView='sec'+page;
   var pgLabels=['Memories','Affirmations','Songs','Notes to Me','Voices'];
-  var pgIcons=['&#128248;','&#128173;','&#127925;','&#9993;&#65039;','&#127908;'];
+  var pgTitles=['Your <em>Memories</em>','Your <em>Affirmations</em>','Comfort <em>Songs</em>','Notes to <em>Me</em>','Safe <em>Voices</em>'];
+  var pgSubs=['Photos and videos of people and places that feel like home.','Things you need to hear, pinned where you\'ll see them.','The ones you play when you need to feel okay.','Set a date and seal your note. It stays locked until that day arrives.','Voices that make you feel safe, kept for when you need them.'];
 
   var pages=[
     /* Page 0 — Memories */
-    '<div style="padding:12px 8px 70px">'+(S.crPhotos.length?
+    '<div style="padding:12px 8px 70px">'+crFrameNote()+crPhotoMsgHtml()+(S.crPhotos.length?
       '<div style="display:flex;flex-wrap:wrap;justify-content:center">'+S.crPhotos.map(polaroid).join('')+'</div>':
-      '<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:30px 20px 10px">The walls are bare for now. Add a photo of someone or somewhere that feels like home.</div>')+
-      '<div style="margin-top:16px;border-top:1px dashed '+p.bdr+';padding-top:14px">'+
-        '<button id="cr-addphoto" style="display:block;width:100%;padding:10px;background:none;border:1.5px dashed '+p.bdr+';border-radius:12px;font-size:13px;color:'+p.accent+';cursor:pointer;font-family:\'DM Sans\',sans-serif">+ Add photos or videos</button>'+
+      '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t3);text-align:center;padding:30px 20px 10px">The walls are bare for now. Add a photo of someone or somewhere that feels like home.</div>')+
+      '<div style="position:relative;margin-top:16px;border-top:1px dashed '+p.bdr+';padding-top:14px">'+
+        '<input type="file" id="cr-photo-input" multiple accept="image/*,video/*" style="position:absolute;top:14px;left:0;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0,0,0,0)">'+
+        '<label for="cr-photo-input" id="cr-addphoto" style="display:block;width:100%;padding:12px;text-align:center;border:1.5px dashed '+p.bdr+';border-radius:12px;font-size:13px;cursor:pointer;color:'+p.accent+'">+ Add photos or videos</label>'+
+        '<div style="font-size:11px;color:var(--t3);text-align:center;margin-top:8px">Videos play this session. Thumbnails stay.</div>'+
       '</div>'+
     '</div>',
 
     /* Page 1 — Affirmations */
     '<div style="padding:16px 12px 70px">'+
-      (S.crAffirmations.length?S.crAffirmations.map(affCard).join(''):'<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:30px 20px 10px">Nothing pinned up yet. Write yourself something kind, or borrow one below.</div>')+
+      (S.crAffirmations.length?S.crAffirmations.map(affCard).join(''):'<div class="serif" style="font-size:13px;font-style:italic;color:var(--t3);text-align:center;padding:30px 20px 10px">Nothing pinned up yet. Write yourself something kind, or borrow one below.</div>')+
       '<div style="margin-top:8px;border-top:1px dashed '+p.bdr+';padding-top:14px">'+
         (S.crAffEditIdx!==-1&&S.crAffEditIdx!==undefined?
-          '<div style="font-size:11px;font-weight:600;color:var(--acc);margin-bottom:4px">Changing this one</div>':'')+
-        '<textarea id="cr-afftxt" rows="2" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:14px;font-family:\'DM Serif Display\',serif;font-style:italic;background:'+p.card+';color:'+p.txt+';resize:none;margin-bottom:6px" placeholder="Something you need to hear…">'+esc(S.crAffText||'')+'</textarea>'+
+          '<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--acc);margin-bottom:4px">Changing this one</div>':'')+
+        '<textarea id="cr-afftxt" rows="2" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:14px;background:'+p.card+';color:'+p.txt+';resize:none;margin-bottom:6px" placeholder="Something you need to hear…">'+esc(S.crAffText||'')+'</textarea>'+
         '<button id="cr-affsave" style="width:100%;padding:9px;margin-bottom:8px;background:'+p.accent+';color:#fff;border:none;border-radius:12px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Pin it up</button>'+
-        '<div style="font-size:11px;color:'+p.txt+';opacity:.5;margin-bottom:6px;font-weight:500">Or borrow one of these:</div>'+
+        '<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--t2);margin-bottom:6px">Or borrow one of these</div>'+
         '<div style="display:flex;flex-wrap:wrap;gap:6px">'+
           PRESET_AFFS.map(function(aff,pi){
             return '<button data-preset="'+pi+'" style="padding:6px 10px;background:'+p.card+';border:1px solid '+p.bdr+';border-radius:20px;font-size:11px;color:'+p.txt+';cursor:pointer;font-family:\'DM Serif Display\',serif;font-style:italic;text-align:left">'+esc(aff.slice(0,30))+(aff.length>30?'&#8230;':'')+'</button>';
@@ -2065,25 +2192,24 @@ function drawComfortScrapbook(){
 
     /* Page 2 — Songs */
     '<div style="padding:14px 12px 70px">'+
-      (S.crSongs.length?S.crSongs.map(songStub).join(''):'<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:30px 20px 10px">No songs yet. Add the one you play when you need to feel okay.</div>')+
+      (S.crSongs.length?S.crSongs.map(songStub).join(''):'<div class="serif" style="font-size:13px;font-style:italic;color:var(--t3);text-align:center;padding:30px 20px 10px">No songs yet. Add the one you play when you need to feel okay.</div>')+
       '<div style="margin-top:8px;border-top:1px dashed '+p.bdr+';padding-top:14px">'+
-        '<input id="cr-sgname" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:13px;background:'+p.card+';color:'+p.txt+';margin-bottom:6px;font-family:\'DM Sans\',sans-serif" placeholder="Song name — Artist" value="'+esc(S.crSongDraft&&S.crSongDraft.name||'')+'">'+
-        '<input id="cr-sgurl" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:13px;background:'+p.card+';color:'+p.txt+';margin-bottom:6px;font-family:\'DM Sans\',sans-serif" placeholder="Paste a link (Spotify, YouTube&#8230;)" value="'+esc(S.crSongDraft&&S.crSongDraft.url||'')+'">'+
+        '<input id="cr-sgname" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:14px;background:'+p.card+';color:var(--text);margin-bottom:6px" placeholder="Song name — Artist" value="'+esc(S.crSongDraft&&S.crSongDraft.name||'')+'">'+
+        '<input id="cr-sgurl" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:14px;background:'+p.card+';color:var(--text);margin-bottom:6px" placeholder="Paste a link (Spotify, YouTube&#8230;)" value="'+esc(S.crSongDraft&&S.crSongDraft.url||'')+'">'+
         '<button id="cr-sgsave" style="width:100%;padding:9px;background:'+p.accent+';color:#fff;border:none;border-radius:12px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Keep this song</button>'+
       '</div>'+
     '</div>',
 
     /* Page 3 — Notes to Future Me */
     '<div style="padding:14px 12px 70px">'+
-      '<div style="background:rgba(0,0,0,.04);border-radius:12px;padding:12px 14px;margin-bottom:14px"><div style="font-size:13px;font-weight:500;color:'+p.txt+';margin-bottom:4px">Write to your future self</div><div style="font-size:12px;color:'+p.txt+';opacity:.65;line-height:1.5">Set a date and seal your note — it stays locked until that day arrives. A little kindness from past you, waiting at the right moment.</div></div>'+
       (S.crNotes.length?
         S.crNotes.map(function(n,i){var openD=new Date(n.openDate+'T00:00:00');return envelope(n,i,today>=openD);}).join(''):
-        '<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.45;text-align:center;padding:20px 20px 10px">No letters waiting yet. Write one for a day that might need it.</div>')+
+        '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t3);text-align:center;padding:20px 20px 10px">No letters waiting yet. Write one for a day that might need it.</div>')+
       '<div style="margin-top:8px;border-top:1px dashed '+p.bdr+';padding-top:14px">'+
-        '<textarea id="cr-notetxt" rows="3" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:14px;font-family:\'DM Serif Display\',serif;font-style:italic;background:'+p.card+';color:'+p.txt+';resize:none;margin-bottom:6px" placeholder="Dear future me&#8230;">'+esc(S.crNoteText||'')+'</textarea>'+
+        '<textarea id="cr-notetxt" rows="3" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:14px;background:'+p.card+';color:'+p.txt+';resize:none;margin-bottom:6px" placeholder="Dear future me&#8230;">'+esc(S.crNoteText||'')+'</textarea>'+
         '<div style="display:flex;gap:8px;align-items:flex-end">'+
-          '<div style="flex:1"><div style="font-size:10px;color:var(--t3);margin-bottom:3px">Open it on</div>'+
-            '<input type="date" id="cr-notedate" min="'+todayStr+'" value="'+esc(S.crNoteDate||'')+'" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:13px;background:'+p.card+';color:'+p.txt+';font-family:\'DM Sans\',sans-serif"></div>'+
+          '<div style="flex:1"><div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--t2);margin-bottom:4px">Open it on</div>'+
+            '<input type="date" id="cr-notedate" min="'+todayStr+'" value="'+esc(S.crNoteDate||'')+'" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:14px;background:'+p.card+';color:var(--text)"></div>'+
           '<button id="cr-notesave" style="padding:9px 14px;background:'+p.accent+';color:#fff;border:none;border-radius:12px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Seal</button>'+
         '</div>'+
       '</div>'+
@@ -2098,29 +2224,30 @@ function drawComfortScrapbook(){
           '<div style="flex:1;min-width:0">'+
             '<div style="font-size:13px;font-weight:600;color:'+p.txt+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(v.label)+'</div>'+
             (src?'<audio id="va-'+v.id+'" src="'+src+'" controls preload="metadata" style="width:100%;height:28px;margin-top:4px;accent-color:'+p.accent+'"></audio>':
-              '<div style="font-size:11px;color:'+p.txt+';opacity:.75;margin-top:3px;line-height:1.45">This recording is no longer available. Delete and re-record, or upload an audio file instead.</div>')+
+              '<div style="font-size:11px;color:var(--t2);margin-top:3px;line-height:1.45">This recording is no longer available. Delete and re-record, or upload an audio file instead.</div>')+
           '</div>'+
           '<button data-vcdel="'+i+'" aria-label="Delete '+esc(v.label)+'" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:18px;flex-shrink:0">&#215;</button>'+
         '</div>';
       }
-      var vcList=S.crVoices&&S.crVoices.length?S.crVoices.map(voiceCard).join(''):'<div class="serif" style="font-size:13px;font-style:italic;color:'+p.txt+';opacity:.55;text-align:center;padding:30px 20px 10px;line-height:1.6">No voices here yet. Keep one that makes you feel safe — a friend, a parent, or your own.</div>';
+      var vcList=S.crVoices&&S.crVoices.length?S.crVoices.map(voiceCard).join(''):'<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);text-align:center;padding:30px 20px 10px;line-height:1.6">No voices here yet. Keep one that makes you feel safe — a friend, a parent, or your own.</div>';
       var msgHtml=voiceMsg?
         '<div style="display:flex;align-items:flex-start;gap:8px;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.5;'+
           (voiceMsg.ok?'background:var(--gbg);border:1.5px solid var(--gbdr);color:var(--gt)':'background:var(--sos);border:1.5px solid var(--sosbdr);color:var(--sosh)')+'">'+
           '<span style="flex-shrink:0">'+(voiceMsg.ok?'✓':'!')+'</span><span>'+esc(voiceMsg.text)+'</span></div>':'';
       return '<div style="padding:14px 12px 70px">'+
+        crFrameNote()+
         msgHtml+
         vcList+
         '<div style="margin-top:10px;border-top:1px dashed '+p.bdr+';padding-top:14px">'+
-          '<div style="font-size:12px;font-weight:500;color:'+p.txt+';opacity:.75;margin-bottom:4px">Record a voice note</div>'+
-          (voiceRecording?'':'<div style="display:flex;align-items:flex-start;gap:6px;font-size:12px;color:'+p.txt+';background:'+p.card+';border:1px dashed '+p.bdr+';border-radius:10px;padding:8px 10px;margin-bottom:8px;line-height:1.45"><span aria-hidden="true">🎙</span><span>Tap Record — your browser will ask for microphone access.</span></div>')+
-          '<div style="font-size:11px;color:'+p.txt+';opacity:.6;margin-bottom:8px;line-height:1.45">Up to 1 minute. It stays on this device, so it\'ll still be here next time.</div>'+
+          '<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--t2);margin-bottom:6px">Record a voice note</div>'+
+          (voiceRecording?'':'<div style="display:flex;align-items:flex-start;gap:6px;font-size:13px;color:var(--text);background:'+p.card+';border:1px dashed '+p.bdr+';border-radius:10px;padding:8px 10px;margin-bottom:8px;line-height:1.45"><span aria-hidden="true">🎙</span><span>Tap Record — your browser will ask for microphone access.</span></div>')+
+          '<div style="font-size:11px;color:var(--t2);margin-bottom:8px;line-height:1.45">Up to 1 minute. It stays on this device, so it\'ll still be here next time.</div>'+
           '<div style="display:flex;gap:8px;margin-bottom:10px">'+
-            '<input id="vc-label" placeholder="Whose voice is this?" style="flex:1;min-width:0;padding:9px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:13px;background:'+p.card+';color:'+p.txt+';font-family:\'DM Sans\',sans-serif"'+(voiceRecording?' disabled':'')+'>'+
+            '<input id="vc-label" placeholder="Whose voice is this?" style="flex:1;min-width:0;padding:9px 12px;border:1.5px solid '+p.bdr+';border-radius:10px;font-size:14px;background:'+p.card+';color:var(--text)"'+(voiceRecording?' disabled':'')+'>'+
             '<button id="vc-rec" style="padding:9px 14px;background:'+(voiceRecording?'var(--acc)':p.accent)+';color:#fff;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif;white-space:nowrap">'+(voiceRecording?'⏹ Stop':'⏺ Record')+'</button>'+
           '</div>'+
           (voiceRecording?'<div id="vc-timer" style="font-size:12px;color:var(--acc);margin-bottom:10px;animation:pulse 1s infinite">● Recording… '+fmtVoiceSecs(Math.floor((Date.now()-voiceStart)/1000))+' / 1:00</div>':'')+
-          '<div style="font-size:12px;font-weight:500;color:'+p.txt+';opacity:.75;margin-bottom:6px">Or upload an audio file</div>'+
+          '<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--t2);margin-bottom:6px">Or upload an audio file</div>'+
           '<label for="cr-audio-input" id="vc-upload" role="button" tabindex="0" style="display:block;width:100%;padding:9px;background:none;border:1.5px dashed '+p.bdr+';border-radius:12px;font-size:13px;color:'+p.accent+';cursor:pointer;font-family:\'DM Sans\',sans-serif;text-align:center">+ Upload a voice note (up to 3 MB)</label>'+
         '</div>'+
       '</div>';
@@ -2129,79 +2256,17 @@ function drawComfortScrapbook(){
 
   shell(
     '<button class="bk" id="mcbk"><i class="ti ti-arrow-left" style="font-size:18px"></i>Back</button>'+
-    '<span style="font-size:16px;margin:0 auto">'+pgIcons[page]+' '+pgLabels[page]+'</span>',
-    '<div class="cr-stage cr-grain" style="background:'+p.bg+';--crglow:'+(dark?p.glow.replace(/[\d.]+\)$/,'.4)'):'rgba(255,214,150,.5)')+'"><div class="cr-shimmer"></div>'+
-      '<div class="cr-scroll'+(secAnim?' cr-sec-in':'')+'">'+pages[page]+'</div></div>',
+    '<span class="tbt">'+pgLabels[page].toLowerCase()+'</span>',
+    '<div class="cr-stage cr-grain" style="background:'+p.bg+';--crglow:'+(dark?p.glow.replace(/[\d.]+\)$/,'.4)'):'rgba(255,214,150,.5)')+'"><div class="cr-shimmer cr-deco"></div>'+
+      '<div class="cr-scroll'+(secAnim?' cr-sec-in':'')+'"><div style="padding:14px 16px 0">'+
+        '<div class="serif" style="font-size:21px;color:var(--text);margin-bottom:3px">'+pgTitles[page]+'</div>'+
+        '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);line-height:1.5">'+pgSubs[page]+'</div></div>'+pages[page]+'</div></div>',
     true, true);
 
   var sh=document.querySelector('.shell');if(sh)sh.style.background=p.bg;
   var crtb=document.querySelector('.shell .tb');if(crtb)crtb.style.background=p.bg;
-  var crbk=Q('mcbk');if(crbk){crbk.style.setProperty('color',p.txt,'important');var cri=crbk.querySelector('i');if(cri)cri.style.setProperty('color',p.txt,'important');}
-  var crtit=crtb&&crtb.querySelector('span');if(crtit)crtit.style.color=p.txt;
-  Q('mcbk').onclick=function(){if(sh)sh.style.background='';if(crtb)crtb.style.background='';S.crSection=null;S.crRedecoConfirm=false;voiceMsg=null;drawComfortScrapbook();};
+  Q('mcbk').onclick=function(){if(sh)sh.style.background='';if(crtb)crtb.style.background='';S.crSection=null;S.crRedecoConfirm=false;voiceMsg=null;if(!crPhotoMsgTimer)crPhotoMsg=null;drawComfortScrapbook();};
 
-  /* The input is created once and never removed; each Memories render only re-binds its handler. */
-  var photoIn=crFileInput('cr-photo-input','image/*,image/heic,image/heif,video/mp4,video/quicktime',true);
-  if(page===0)photoIn.onchange=function(e){
-      var files=Array.from(e.target.files||[]);e.target.value='';if(!files.length)return;
-      var processed=0,total=files.length;
-      files.forEach(function(file,fi2){
-        if(file.type.startsWith('video/')){
-          var vid=document.createElement('video');
-          vid.preload='auto';
-          var objUrl=URL.createObjectURL(file);
-          vid.src=objUrl;
-          var vidId=Date.now()+fi2;
-          var thumbDone=false;
-          function captureThumb(){
-            if(thumbDone)return;thumbDone=true;
-            var thumbUrl='';
-            try{
-              var vw=vid.videoWidth||320,vh=vid.videoHeight||240;
-              var cvs=document.createElement('canvas');
-              cvs.width=Math.min(300,vw);cvs.height=Math.round(cvs.width*vh/Math.max(vw,1));
-              cvs.getContext('2d').drawImage(vid,0,0,cvs.width,cvs.height);
-              thumbUrl=cvs.toDataURL('image/jpeg',.72);
-            }catch(e){}
-            videoCache[vidId]=objUrl;
-            S.crPhotos.unshift({id:vidId,url:thumbUrl,isVideo:true});
-            processed++;saveS();
-            if(processed===total){S.crSection=0;drawComfortScrapbook();}
-          }
-          vid.onloadeddata=function(){setTimeout(captureThumb,400);};
-          vid.onseeked=function(){setTimeout(captureThumb,100);};
-          vid.onerror=function(){if(!thumbDone){thumbDone=true;S.crPhotos.unshift({id:vidId,url:'',isVideo:true});URL.revokeObjectURL(objUrl);processed++;saveS();if(processed===total){S.crSection=0;drawComfortScrapbook();}}};
-          vid.currentTime=0;
-          vid.load();
-        } else {
-          var reader=new FileReader();
-          reader.onload=function(ev){
-            var rawUrl=ev.target.result;
-            var img=new Image();
-            img.onload=function(){
-              try{
-                var cvs=document.createElement('canvas');
-                var maxW=600,maxH=600,ratio=Math.min(maxW/img.width,maxH/img.height,1);
-                cvs.width=Math.round(img.width*ratio);cvs.height=Math.round(img.height*ratio);
-                cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);
-                S.crPhotos.unshift({id:Date.now()+fi2,url:cvs.toDataURL('image/jpeg',.72)});
-              }catch(e){
-                S.crPhotos.unshift({id:Date.now()+fi2,url:rawUrl});
-              }
-              processed++;saveS();
-              if(processed===total){S.crSection=0;drawComfortScrapbook();}
-            };
-            img.onerror=function(){
-              S.crPhotos.unshift({id:Date.now()+fi2,url:rawUrl});
-              processed++;saveS();
-              if(processed===total){S.crSection=0;drawComfortScrapbook();}
-            };
-            img.src=rawUrl;
-          };reader.readAsDataURL(file);
-        }
-      });
-  };
-  var addPh=Q('cr-addphoto');if(addPh)addPh.onclick=function(){document.getElementById('cr-photo-input').click();};
 
   document.querySelectorAll('[data-phview]').forEach(function(d){d.onclick=function(){
     var idx=parseInt(d.dataset.phview),ph=S.crPhotos[idx];if(!ph)return;
