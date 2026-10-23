@@ -125,6 +125,7 @@ canvas{display:block;touch-action:none}
 .cr-dtile{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px 9px;border-radius:14px;background:var(--bg2);border:1.5px solid var(--bdr);cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .15s ease}
 .cr-dtile:active{transform:scale(.96)}
 .cr-dtile.on{border:2px solid var(--grn);background:var(--gbg)}
+.cr-dtile:not(.on){border-color:var(--bdr)}
 .cr-dprev{position:relative;width:76px;height:54px;border-radius:10px;overflow:hidden;display:flex;align-items:flex-end;justify-content:center}
 .cr-deco{pointer-events:none!important}
 .cr-sheet-ov{position:absolute;inset:0;background:rgba(0,0,0,.42);display:flex;align-items:flex-end;z-index:120}
@@ -194,6 +195,14 @@ var GAMES=[
  {id:'stonestack',t:'Stone Stack',d:'One stone at a time.',e:'🪨',bg:'#f0ece4'},
  {id:'breathbubble',t:'Breathing Bubbles',d:'Breathe with it. That\'s all.',e:'🌬',bg:'#dceaff'}
 ];
+/* One explainer per My Corner feature: shown on its landing card and again at the top of its screen */
+var MC_EXPLAIN={
+  comfort:'A safe space to keep all your favourite memories, so you can visit when you need some comfort. Design it your own way.',
+  wins:'Anxiety makes us feel we\'re not doing enough. Celebrate all your little wins, because they matter.',
+  unsent:'Write a letter to someone you can\'t or won\'t send it to. Keep it in a private drawer, or let it go.',
+  wcs:'Write down the worst thing you\'re afraid might happen. Seeing it on paper can shrink it. Save it or pop it away.'
+};
+function mcExplain(k,mb){return '<div class="mc-explain" style="font-size:12px;font-weight:400;color:var(--t2);line-height:1.5;margin-bottom:'+(mb==null?14:mb)+'px">'+MC_EXPLAIN[k]+'</div>';}
 var CR_PALETTES={
   amber:{wall:'#e8c87a',floor:'#7a5530',glow:'rgba(240,180,60,.18)',name:'Warm Amber',bg:'#fdf6e8',accent:'#b8690a',card:'rgba(255,252,240,.92)',bdr:'rgba(200,160,40,.3)',txt:'#4a3000',bgD:'#1a1208',cardD:'rgba(36,24,8,.97)',txtD:'#e8c890',bdrD:'rgba(200,160,60,.2)',accentD:'#d4801a'},
   blush:{wall:'#e8b0a8',floor:'#7a4840',glow:'rgba(240,140,130,.18)',name:'Soft Blush',bg:'#fdf0f0',accent:'#b84050',card:'rgba(255,248,248,.92)',bdr:'rgba(200,100,100,.3)',txt:'#4a0a1a',bgD:'#1a0808',cardD:'rgba(36,10,14,.97)',txtD:'#e8a0b0',bdrD:'rgba(200,100,100,.2)',accentD:'#d86070'},
@@ -209,7 +218,7 @@ var CR_MASCOTS=[
   {id:'bear',e:'🐻',name:'Bear',desc:'Steady, grounding'}
 ];
 var PRESET_AFFS=['I am doing the best I can, and that is enough.','This feeling will pass.','I am allowed to take up space.','My anxiety does not define me.','I am worthy of rest and peace.','I am more than my worries.','I choose to be kind to myself today.','I am safe right now.','Progress, not perfection.','My feelings are valid.','I trust myself to handle what comes.','I deserve gentleness.'];
-function mkS(){return{ob:false,obStep:0,obPath:'',name:'',dob:'',emergContact:{name:'',phone:''},notifEnabled:false,notifTime:'09:00',lastNotifDate:'',lastSupNotifDate:'',scr:'mood',mood:null,moodHist:{},streak:0,dump:'',micOn:false,ventDone:false,ventSaved:false,ventLog:[],ventEditIdx:-1,ventHistDate:undefined,supTab:'sos',trickModal:false,tricks:['ground','candy','cold'],customTricks:[],jv:['','',''],jlog:[],winEditIdx:-1,profEdit:false,pName:'',pDob:'',confirmDelete:false,calmTab:'games',unsentComposing:false,unsentDraftTo:'',unsentDraftText:'',unsentMicOn:false,unsentDrawer:[],wcsDraft:'',wcsLog:[],wcsEditIdx:-1,wcsSaved:false,crSetup:false,crColor:'amber',crMascot:null,crMascotName:'',crPhotos:[],crAffirmations:[],crSongs:[],crNotes:[],crOpenDrawers:{photos:false,affirmations:false,songs:false,notes:false},crAffText:'',crSongDraft:{name:'',url:''},crNoteText:'',crNoteDate:'',myCornerTab:null,crPage:0,crSection:null,crRedecoConfirm:false,crAffEditIdx:-1,doodleGallery:[],crVoices:[],crFairyLights:false,crDecor:null,crPlantStage:0,crPlantLastSeen:'',crDecorOpen:false};}
+function mkS(){return{ob:false,obStep:0,obPath:'',name:'',dob:'',emergContact:{name:'',phone:''},notifEnabled:false,notifTime:'09:00',lastNotifDate:'',lastSupNotifDate:'',scr:'mood',mood:null,moodHist:{},streak:0,dump:'',micOn:false,ventDone:false,ventSaved:false,ventLog:[],ventEditIdx:-1,ventHistDate:undefined,supTab:'sos',trickModal:false,tricks:['ground','candy','cold'],customTricks:[],jv:['','',''],jlog:[],winEditIdx:-1,profEdit:false,pName:'',pDob:'',confirmDelete:false,calmTab:'games',unsentComposing:false,unsentDraftTo:'',unsentDraftText:'',unsentMicOn:false,unsentDrawer:[],wcsDraft:'',wcsLog:[],wcsEditIdx:-1,wcsSaved:false,crSetup:false,crColor:'amber',crMascot:null,crMascotName:'',crPhotos:[],crAffirmations:[],crSongs:[],crNotes:[],crOpenDrawers:{photos:false,affirmations:false,songs:false,notes:false},crAffText:'',crSongDraft:{name:'',url:''},crNoteText:'',crNoteDate:'',myCornerTab:null,crPage:0,crSection:null,crRedecoConfirm:false,crAffEditIdx:-1,doodleGallery:[],crVoices:[],crFairyLights:false,crDecorActive:[],crSetupStep:0,crSetupOpen:false,crSetupOnly:false,crPlantStage:0,crPlantLastSeen:''};}
 var S=mkS(),bRAF=null,bPS=null,bPI=0,gLoop=null,ambRAF=null,ambObj={},recog=null;
 var ventCollapsed={};
 var ventSortByDay=false;
@@ -222,7 +231,7 @@ var voiceCache={};
 var voiceRecorder=null,voiceChunks=[],voiceRecording=false,voiceTimer=null,voiceTick=null,voiceStart=0;
 var voiceMsg=null; /* {ok:bool,text:string} — banner on the Voices page */
 var VOICE_MAX_SEC=60,VOICE_MAX_UPLOAD=3*1024*1024,AO_STORE_LIMIT=4.8e6;
-var AO_PERSIST=['name','dob','ob','obPath','moodHist','streak','jlog','ventLog','wcsLog','unsentDrawer','tricks','customTricks','crSetup','crColor','crMascot','crMascotName','crPhotos','crAffirmations','crSongs','crNotes','crVoices','doodleGallery','crFairyLights','crDecor','crPlantStage','crPlantLastSeen','emergContact','notifEnabled','notifTime','lastNotifDate','lastSupNotifDate'];
+var AO_PERSIST=['name','dob','ob','obPath','moodHist','streak','jlog','ventLog','wcsLog','unsentDrawer','tricks','customTricks','crSetup','crColor','crMascot','crMascotName','crPhotos','crAffirmations','crSongs','crNotes','crVoices','doodleGallery','crDecorActive','crPlantStage','crPlantLastSeen','emergContact','notifEnabled','notifTime','lastNotifDate','lastSupNotifDate'];
 function aoSerialize(){var d={};AO_PERSIST.forEach(function(k){d[k]=S[k];});if(d.crPhotos)d.crPhotos=d.crPhotos.map(function(ph){var c=Object.assign({},ph);delete c.videoUrl;return c;});return JSON.stringify(d);}
 /* Persist state. On failure nothing already saved is touched (the old fallback deleted everything and retried). */
 function aoIsQuota(e){return !!e&&(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED'||e.code===22||e.code===1014);}
@@ -235,7 +244,7 @@ function aoToast(text){
   t.textContent=text;sh.appendChild(t);setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},4500);
 }
 function saveS(){var r=aoPersist();if(!r.ok&&r.quota)aoToast('Your room is full. Delete a few photos to add more.');return r.ok;}
-function loadS(){try{var d=localStorage.getItem('ao_s');if(d){var p=JSON.parse(d);AO_PERSIST.forEach(function(k){if(p[k]!==undefined)S[k]=p[k];});if(p.crDecor===undefined&&p.crSetup)S.crDecor=p.crFairyLights?'lights':'plant';if(S.crPhotos){var dirty=false;S.crPhotos.forEach(function(ph){if(ph.videoUrl){delete ph.videoUrl;dirty=true;}});if(dirty){try{localStorage.removeItem('ao_s');}catch(e){}saveS();}}}}catch(e){}}
+function loadS(){try{var d=localStorage.getItem('ao_s');if(d){var p=JSON.parse(d);AO_PERSIST.forEach(function(k){if(p[k]!==undefined)S[k]=p[k];});if(!Array.isArray(p.crDecorActive)){var oldD=p.crDecor!==undefined?p.crDecor:(p.crSetup?(p.crFairyLights?'lights':'plant'):null);S.crDecorActive=oldD?[oldD]:[];}/* one-time migration from the single-choice key */if(S.crPhotos){var dirty=false;S.crPhotos.forEach(function(ph){if(ph.videoUrl){delete ph.videoUrl;dirty=true;}});if(dirty){try{localStorage.removeItem('ao_s');}catch(e){}saveS();}}}}catch(e){}}
 function Q(id){return document.getElementById(id);}
 function fmtVoiceSecs(n){return Math.floor(n/60)+':'+String(n%60).padStart(2,'0');}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -881,7 +890,7 @@ function drawSupport(){
 /* ── WORST CASE SCENARIO ── */
 function drawWCS(){
   var body='<div class="serif" style="font-size:21px;color:var(--text);margin-top:4px;margin-bottom:3px">Worst Case <em>Scenario</em></div>';
-  body+='<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:14px;line-height:1.5">Write down the worst that could happen. Sometimes seeing it on paper takes some of its power away.</div>';
+  body+=mcExplain('wcs');
   if(S.wcsEditIdx!==-1) body+='<div style="background:var(--gbg);border:1.5px solid var(--gbdr);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--gt)">You\'re changing something you wrote earlier. Keep it, or let it go.</div>';
   if(S.wcsSaved) body+='<div class="bnr"><i class="ti ti-mail" style="font-size:18px;color:var(--grn)"></i>Tucked away safely. It\'s yours.</div>';
   body+='<textarea class="ta" id="dt" rows="4" placeholder="What\'s the absolute worst that happens…?" style="margin-bottom:10px">'+S.wcsDraft+'</textarea>';
@@ -925,7 +934,7 @@ function drawWins(){
   shell('<button class="bk" id="wb"><i class="ti ti-arrow-left" style="font-size:18px"></i>Back</button><span class="tbt">today\'s wins</span>',
     '<div style="font-size:11px;color:var(--t3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">'+dStr()+'</div>'+
     '<div class="serif" style="font-size:21px;color:var(--text);margin-bottom:3px">Today\'s <em>wins</em> 🌟</div>'+
-    '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:1rem;line-height:1.5">Anxiety makes you feel like you\'re not doing enough — even on days you\'re doing plenty. A good cup of coffee, a great poop, getting out of bed. Write it down. It counts.</div>'+
+    mcExplain('wins')+
     [0,1,2].map(function(i){
       var lb=['Something I did today','A moment I\'m proud of','One thing that was okay'];
       var pr=['e.g. sent a difficult message, made my bed...','e.g. kept going even when it was hard...','e.g. had a good cup of tea, rested when needed...'];
@@ -1492,8 +1501,8 @@ function drawMyCorner(){
       return '<div class="mc-in" style="animation-delay:'+(200+i*100)+'ms">'+
         '<button '+attr+' class="mc-card" style="width:100%;padding:16px;background:var(--bg2);border:.5px solid var(--bdr);border-radius:18px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:14px">'+
           '<span style="font-size:30px;flex-shrink:0">'+icon+'</span>'+
-          '<div><div style="font-size:15px;font-weight:600;color:var(--text);font-family:\'DM Sans\',sans-serif">'+title+'</div>'+
-          (sub?'<div class="serif" style="font-size:12px;font-style:italic;color:var(--t2);line-height:1.4;margin-top:2px">'+sub+'</div>':'')+
+          '<div style="min-width:0"><div style="font-size:15px;font-weight:600;color:var(--text);font-family:\'DM Sans\',sans-serif;margin-bottom:3px">'+title+'</div>'+
+          mcExplain(sub,0)+
           '</div>'+
         '</button></div>';
     }
@@ -1503,10 +1512,10 @@ function drawMyCorner(){
       '<div class="serif mc-fade" style="font-size:24px;font-style:italic;color:var(--text);padding-top:4px;margin-bottom:8px;line-height:1.3">This space is entirely yours.</div>'+
       '<div class="mc-fade" style="font-size:13px;color:var(--t2);line-height:1.65;margin-bottom:22px;animation-delay:80ms">Your wins, your words, your comfort — all in one place. Just for you.</div>'+
       '<div style="display:flex;flex-direction:column;gap:10px">'+
-        mcCard(0,'data-mctab="comfort"','🏡','Comfort Room','')+
-        mcCard(1,'data-mctab="wins"','🌟','Wins','')+
-        mcCard(2,'data-mctab="unsent"','✉️','Letters I\'ll Never Send','')+
-        mcCard(3,'id="mc-wcs"','🌪️','Worst Case Scenario','Name the fear. Watch it shrink.')+
+        mcCard(0,'data-mctab="comfort"','🏡','Comfort Room','comfort')+
+        mcCard(1,'data-mctab="wins"','🌟','Wins','wins')+
+        mcCard(2,'data-mctab="unsent"','✉️','Letters I\'ll Never Send','unsent')+
+        mcCard(3,'id="mc-wcs"','🌪️','Worst Case Scenario','wcs')+
       '</div></div>',
       true);
     var mw=Q('mc-wcs');if(mw)mw.onclick=function(){go('wcs');};
@@ -1515,7 +1524,7 @@ function drawMyCorner(){
     return;
   }
   if(S.myCornerTab==='comfort'){
-    if(!S.crSetup||!S.crMascot){drawComfortSetup();return;}
+    if(!S.crSetup||!S.crMascot||S.crSetupOpen){drawComfortSetup();return;}
     drawComfortScrapbook();
     return;
   }
@@ -1537,7 +1546,7 @@ function drawMyCornerWins(){
     '<div style="padding-top:14px">'+
     '<div style="font-size:11px;color:var(--t3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">'+dStr(today)+'</div>'+
     '<div class="serif" style="font-size:21px;color:var(--text);margin-bottom:3px">Today\'s <em>wins</em> 🌟</div>'+
-    '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:1rem;line-height:1.5">Anxiety makes you feel like you\'re not doing enough — even on days you\'re doing plenty. A good cup of coffee, a great poop, getting out of bed. Write it down. It counts.</div>'+
+    mcExplain('wins')+
     [0,1,2].map(function(i){
       return '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">'+lb[i]+'</div>'+
         '<textarea class="ta" id="jv'+i+'" rows="2" placeholder="'+pr[i]+'" style="resize:none">'+esc(jv[i]||'')+'</textarea></div>';
@@ -1580,7 +1589,7 @@ function drawMyCornerUnsent(){
   var drawer=S.unsentDrawer||[];
   var body='';
   body+='<div class="serif" style="font-size:20px;color:var(--text);margin-top:4px;margin-bottom:3px">Letters <em>I\'ll Never Send</em></div>'+
-    '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:14px;line-height:1.5">Write a letter or a message to someone you\'ll never send it to — because they\'re not in your life anymore, they\'re not that close anymore, or you\'re just too scared to. Watch it heal you.</div>';
+    mcExplain('unsent');
   if(S.unsentComposing){
     body+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:13px;font-weight:500;color:var(--text)">New letter</div></div>'+
       '<div style="font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">To</div>'+
@@ -1869,6 +1878,32 @@ function crStartSnow(){
   crSnowRAF=requestAnimationFrame(frame);
 }
 /* Small static previews for the picker tiles */
+function crHas(k){return Array.isArray(S.crDecorActive)&&S.crDecorActive.indexOf(k)>=0;}
+function crToggleDecor(k){if(!Array.isArray(S.crDecorActive))S.crDecorActive=[];var i=S.crDecorActive.indexOf(k);if(i>=0)S.crDecorActive.splice(i,1);else S.crDecorActive.push(k);}
+/* Toggle tiles for the five room elements — used by the setup flow's elements step */
+function crElementTilesHtml(p){
+  return '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px">'+
+      '<div style="font-size:12px;color:var(--t2);line-height:1.45">Each one adds its own atmosphere.</div>'+
+      '<div style="display:flex;gap:12px;flex-shrink:0"><button id="cr-dec-all" style="background:none;border:none;padding:0;font-size:12px;font-weight:500;color:var(--grn);cursor:pointer">Select all</button>'+
+      '<button id="cr-dec-clear" style="background:none;border:none;padding:0;font-size:12px;font-weight:500;color:var(--t2);cursor:pointer">Clear</button></div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'+
+    CR_DECOR.map(function(o){
+      var on=crHas(o.k);
+      return '<button class="cr-dtile'+(on?' on':'')+'" data-decor="'+o.k+'" aria-pressed="'+on+'" style="position:relative">'+
+        (on?'<span aria-hidden="true" style="position:absolute;top:5px;right:5px;width:18px;height:18px;border-radius:50%;background:var(--grn);color:#fff;font-size:11px;line-height:18px;text-align:center;z-index:1">✓</span>':'')+
+        '<div class="cr-dprev" style="background:'+p.bg+'">'+crDecorPreview(o.k,p)+'</div>'+
+        '<div style="font-size:12px;font-weight:600;color:var(--text);text-align:center;line-height:1.25">'+o.e+' '+o.n+'</div>'+
+        (o.hint?'<div style="font-size:10px;color:var(--t2);font-style:italic;text-align:center;line-height:1.2">'+o.hint+'</div>':'')+
+      '</button>';
+    }).join('')+
+    '</div>';
+}
+function crBindElementTiles(redraw){
+  document.querySelectorAll('[data-decor]').forEach(function(b){b.onclick=function(){crToggleDecor(b.dataset.decor);saveS();redraw();};});
+  var all=Q('cr-dec-all');if(all)all.onclick=function(){S.crDecorActive=CR_DECOR.map(function(o){return o.k;});saveS();redraw();};
+  var clr=Q('cr-dec-clear');if(clr)clr.onclick=function(){S.crDecorActive=[];saveS();redraw();};
+}
 function crDecorPreview(k,p){
   var sc=function(html,s,dy){return '<div style="transform:scale('+s+');transform-origin:50% 100%;margin-bottom:'+(dy||0)+'px">'+html+'</div>';};
   if(k==='plant')return sc(crPlantHtml(4),.72,2);
@@ -1895,39 +1930,77 @@ function crFileInput(id,accept,multiple){
   el.accept=accept;el.multiple=!!multiple;return el;
 }
 function crTodayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+/* Room setup: colour → companion & name → room elements. First visit, "Change my room" (all steps,
+   prefilled, Back restores what was there) and "Add atmosphere" (elements step only). */
+var crSetupSnap=null;
+function crOpenSetup(step,only){
+  crSetupSnap={crColor:S.crColor,crMascot:S.crMascot,crMascotName:S.crMascotName,crDecorActive:(S.crDecorActive||[]).slice()};
+  S.crSetupOpen=true;S.crSetupStep=step;S.crSetupOnly=!!only;crLastView=null;drawComfortSetup();
+}
+function crCloseSetup(restore){
+  if(restore&&crSetupSnap){S.crColor=crSetupSnap.crColor;S.crMascot=crSetupSnap.crMascot;S.crMascotName=crSetupSnap.crMascotName;S.crDecorActive=crSetupSnap.crDecorActive;saveS();}
+  crSetupSnap=null;S.crSetupOpen=false;S.crSetupOnly=false;S.crSetupStep=0;S.crSection=null;crLastView=null;S.myCornerTab='comfort';drawMyCorner();
+}
 function drawComfortSetup(){
   var p=CR_PALETTES[S.crColor]||CR_PALETTES.amber;
-  var colorSwatches=Object.keys(CR_PALETTES).map(function(k){
-    var cp=CR_PALETTES[k];var sel=S.crColor===k;
-    return '<button data-crcolor="'+k+'" style="flex:1;padding:10px 4px;border-radius:12px;border:2.5px solid '+(sel?'#3a8a4a':'var(--bdr)')+';background:'+cp.wall+';cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .15s"><div style="width:28px;height:14px;border-radius:4px;background:'+cp.floor+'"></div><div style="font-size:9px;font-weight:600;color:#2a1c0e;margin-top:2px">'+cp.name+'</div></button>';
-  }).join('');
-  var mascotCards=CR_MASCOTS.map(function(m){
-    var sel=S.crMascot===m.id;
-    return '<button data-crmascot="'+m.id+'" style="flex:1;min-width:calc(33% - 6px);padding:10px 4px;border-radius:12px;border:2.5px solid '+(sel?'#3a8a4a':'var(--bdr)')+';background:var(--bg2);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="font-size:28px">'+m.e+'</div><div style="font-size:11px;font-weight:600;color:var(--text)">'+m.name+'</div><div style="font-size:9px;color:var(--t3);text-align:center;line-height:1.3">'+m.desc+'</div></button>';
-  }).join('');
-  shell('<button class="bk" id="crbk"><i class="ti ti-arrow-left" style="font-size:18px"></i>Back</button><span class="tbt">comfort room</span>',
-    '<div class="serif" style="font-size:21px;color:var(--text);margin-top:4px;margin-bottom:3px">Set up your <em>Comfort Room</em></div>'+
-    '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:18px;line-height:1.5">Pick a colour for the walls and someone to keep you company.</div>'+
-    '<div style="font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Room colour</div>'+
-    '<div style="display:flex;gap:6px;margin-bottom:18px">'+colorSwatches+'</div>'+
-    '<div style="font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Your companion</div>'+
-    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">'+mascotCards+'</div>'+
-    (S.crMascot?
-      '<div style="font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Name your '+CR_MASCOTS.find(function(m){return m.id===S.crMascot;}).name.toLowerCase()+'</div>'+
-      '<input class="inp" id="cr-name" placeholder="What shall we call them?" maxlength="20" value="'+esc(S.crMascotName)+'">'+
-      '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;margin-top:4px">Up to 20 letters. You can change it anytime.</div>'
-    :'')+
-    '<button class="btn" id="cr-enter"'+(S.crMascot&&S.crMascotName.trim()?'':' disabled')+'>Enter your room →</button>',
-    true);
-  Q('crbk').onclick=function(){S.myCornerTab=null;go('mycorner');};
+  if(dark)p=Object.assign({},p,{bg:p.bgD,card:p.cardD,bdr:p.bdrD,accent:p.accentD});
+  var editing=!!S.crSetupOpen&&!!S.crSetup,only=!!S.crSetupOnly;
+  var step=S.crSetupStep||0;if(only)step=2;
+  var LBL='font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px';
+  var dots=only?'':'<div style="display:flex;align-items:center;gap:6px;margin:2px 0 14px">'+[0,1,2].map(function(i){return '<span style="width:'+(i===step?'18px':'6px')+';height:6px;border-radius:3px;background:'+(i<=step?'var(--grn)':'var(--bdr)')+';transition:width .2s"></span>';}).join('')+'<span style="font-size:11px;color:var(--t3);margin-left:4px">Step '+(step+1)+' of 3</span></div>';
+  var title=editing?'Change your <em>room</em>':'Set up your <em>Comfort Room</em>';
+  var body='';
+  if(step===0){
+    var colorSwatches=Object.keys(CR_PALETTES).map(function(k){
+      var cp=CR_PALETTES[k];var sel=S.crColor===k;
+      return '<button data-crcolor="'+k+'" aria-pressed="'+sel+'" style="flex:1;padding:10px 4px;border-radius:12px;border:2.5px solid '+(sel?'#3a8a4a':'var(--bdr)')+';background:'+cp.wall+';cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .15s"><div style="width:28px;height:14px;border-radius:4px;background:'+cp.floor+'"></div><div style="font-size:9px;font-weight:600;color:#2a1c0e;margin-top:2px">'+cp.name+'</div></button>';
+    }).join('');
+    body='<div class="serif" style="font-size:21px;color:var(--text);margin-top:4px;margin-bottom:3px">'+title+'</div>'+
+      '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:12px;line-height:1.5">Pick a colour for the walls.</div>'+dots+
+      '<div style="'+LBL+'">Room colour</div>'+
+      '<div style="display:flex;gap:6px;margin-bottom:22px">'+colorSwatches+'</div>'+
+      '<button class="btn" id="cr-next">Next →</button>';
+  } else if(step===1){
+    var mascotCards=CR_MASCOTS.map(function(m){
+      var sel=S.crMascot===m.id;
+      return '<button data-crmascot="'+m.id+'" aria-pressed="'+sel+'" style="flex:1;min-width:calc(33% - 6px);padding:10px 4px;border-radius:12px;border:2.5px solid '+(sel?'#3a8a4a':'var(--bdr)')+';background:var(--bg2);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="font-size:28px">'+m.e+'</div><div style="font-size:11px;font-weight:600;color:var(--text)">'+m.name+'</div><div style="font-size:9px;color:var(--t3);text-align:center;line-height:1.3">'+m.desc+'</div></button>';
+    }).join('');
+    body='<div class="serif" style="font-size:21px;color:var(--text);margin-top:4px;margin-bottom:3px">'+title+'</div>'+
+      '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:12px;line-height:1.5">Choose someone to keep you company, and give them a name.</div>'+dots+
+      '<div style="'+LBL+'">Your companion</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">'+mascotCards+'</div>'+
+      (S.crMascot?
+        '<div style="'+LBL+';margin-bottom:6px">Name your '+CR_MASCOTS.find(function(m){return m.id===S.crMascot;}).name.toLowerCase()+'</div>'+
+        '<input class="inp" id="cr-name" placeholder="What shall we call them?" maxlength="20" value="'+esc(S.crMascotName||'')+'">'+
+        '<div style="font-size:11px;color:var(--t3);margin-bottom:14px;margin-top:4px">Up to 20 letters. You can change it anytime.</div>'
+      :'')+
+      '<button class="btn" id="cr-next"'+(S.crMascot&&(S.crMascotName||'').trim()?'':' disabled')+'>Next →</button>';
+  } else {
+    body='<div class="serif" style="font-size:21px;color:var(--text);margin-top:4px;margin-bottom:3px">Add a little <em>atmosphere</em></div>'+
+      '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:12px;line-height:1.5">Pick as many as you like. You can change these any time.</div>'+dots+
+      crElementTilesHtml(p)+
+      '<button class="btn" id="cr-enter" style="margin-top:18px">'+(only?'Done':editing?'Save my room':'Enter your room →')+'</button>'+
+      (only?'':'<button id="cr-skip" style="display:block;margin:12px auto 0;background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline">Skip</button>');
+  }
+  shell('<button class="bk" id="crbk"><i class="ti ti-arrow-left" style="font-size:18px"></i>Back</button><span class="tbt">'+(only?'atmosphere':'comfort room')+'</span>',body,true);
+  Q('crbk').onclick=function(){
+    if(only){crCloseSetup(false);return;}            /* toggles are already saved */
+    if(step>0){S.crSetupStep=step-1;drawComfortSetup();return;}
+    if(editing){crCloseSetup(true);return;}          /* back out of "Change my room": restore what was there */
+    S.crSetupOpen=false;S.myCornerTab=null;go('mycorner');
+  };
   document.querySelectorAll('[data-crcolor]').forEach(function(b){b.onclick=function(){S.crColor=b.dataset.crcolor;drawComfortSetup();};});
   document.querySelectorAll('[data-crmascot]').forEach(function(b){b.onclick=function(){S.crMascot=b.dataset.crmascot;if(!S.crMascotName)S.crMascotName='';drawComfortSetup();};});
-  var cn=Q('cr-name');if(cn)cn.oninput=function(e){S.crMascotName=e.target.value;var btn=Q('cr-enter');if(btn)btn.disabled=!e.target.value.trim();};
-  var enter=Q('cr-enter');if(enter)enter.onclick=function(){if(!S.crMascot||!S.crMascotName.trim())return;S.crSetup=true;saveS();drawComfort();};
+  var cn=Q('cr-name');if(cn)cn.oninput=function(e){S.crMascotName=e.target.value;var btn=Q('cr-next');if(btn)btn.disabled=!e.target.value.trim();};
+  var nx=Q('cr-next');if(nx)nx.onclick=function(){if(step===1&&!(S.crMascot&&(S.crMascotName||'').trim()))return;S.crSetupStep=step+1;drawComfortSetup();};
+  if(step===2)crBindElementTiles(function(){drawComfortSetup();});
+  function finish(){S.crMascotName=(S.crMascotName||'').trim();S.crSetup=true;saveS();crCloseSetup(false);}
+  var enter=Q('cr-enter');if(enter)enter.onclick=finish;
+  var sk=Q('cr-skip');if(sk)sk.onclick=function(){if(!editing)S.crDecorActive=[];finish();};
 }
 
 function drawComfort(){
-  if(!S.crSetup||!S.crMascot){drawComfortSetup();return;}
+  if(!S.crSetup||!S.crMascot||S.crSetupOpen){drawComfortSetup();return;}
   S.myCornerTab='comfort';
   drawMyCorner();
 }
@@ -2056,7 +2129,7 @@ function drawComfortScrapbook(){
     var animIn=crLastView!=='cover';crLastView='cover';
     function inA(i){return animIn?' class="cr-in" style="animation-delay:'+(i*80)+'ms"':'';} /* attributes for a dedicated wrapper */
     var glow=dark?p.glow.replace(/[\d.]+\)$/,'.45)'):'rgba(255,206,130,.55)';
-    var decor=S.crDecor||null,lightsOn=decor==='lights';
+    var lightsOn=crHas('lights');
     var quoteBg=dark?'linear-gradient(160deg,rgba(255,224,160,.12),rgba(255,224,160,0) 60%),rgba(84,62,26,.95)':'#fffaf0';
     var tornPts=[];for(var k=0;k<=20;k++)tornPts.push((k*5)+'% '+(k%2?'4px':'0'));for(var k2=20;k2>=0;k2--)tornPts.push((k2*5)+'% calc(100% - '+(k2%2?'0px':'4px')+')');
 
@@ -2065,15 +2138,17 @@ function drawComfortScrapbook(){
       '<div class="cr-scroll cr-room"><div style="position:relative;min-height:100%;padding:'+(lightsOn?'36px':'14px')+' 14px 18px">'+
         (lightsOn?crFairyLightsHtml():'')+
         '<div style="position:relative;z-index:1">'+
-        '<button id="cr-decor" style="position:absolute;top:'+(lightsOn?'34px':'10px')+';right:10px;z-index:3;display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;background:'+p.card+';border:1px solid '+p.bdr+';color:var(--text);font-size:13px;font-weight:500;cursor:pointer">✦ Decorate</button>'+
+        '<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button id="cr-decor" style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;background:'+p.card+';border:1px solid '+p.bdr+';color:var(--text);font-size:13px;font-weight:500;cursor:pointer">✦ Add atmosphere</button></div>'+
         /* companion */
         '<div'+inA(0)+'><div style="text-align:center;margin-bottom:18px">'+
-          '<div id="cr-companion" role="button" tabindex="0" aria-label="'+esc(S.crMascotName)+' — tap to redecorate" style="cursor:pointer;display:inline-block">'+
+          '<div id="cr-companion" role="button" tabindex="0" aria-label="'+esc(S.crMascotName)+' — tap to change your room" style="cursor:pointer;display:inline-block">'+
             '<span class="cr-mascot" style="font-size:64px;display:block;line-height:1.05;filter:drop-shadow(0 6px 10px rgba(0,0,0,'+(dark?'.4':'.12')+'))">'+mascot.e+'</span>'+
             '<div style="font-size:13px;font-weight:500;color:var(--text);margin-top:4px">'+esc(S.crMascotName)+'</div>'+
+            '<div style="font-size:11px;color:var(--t3);opacity:.8;margin-top:2px">Tap to change your room</div>'+
           '</div>'+
           '<div class="serif" style="font-size:21px;color:var(--text);margin-top:10px">Your <em>Comfort Room</em></div>'+
           '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-top:2px;line-height:1.5">'+hello+'</div>'+
+          '<div style="max-width:300px;margin:8px auto 0">'+mcExplain('comfort',0)+'</div>'+
         '</div></div>'+
         /* wall */
         '<div style="display:flex;justify-content:center;align-items:flex-start;gap:22px;margin-bottom:26px">'+
@@ -2096,59 +2171,38 @@ function drawComfortScrapbook(){
           '</div></div></div>'+
         /* plant (bottom-left) + redecorate hint */
         '<div'+inA(7)+'><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:14px">'+
-          '<div style="width:82px;flex-shrink:0;display:flex;justify-content:flex-start">'+(decor==='plant'?crPlantHtml(S.crPlantStage):'')+'</div>'+
-          '<div style="flex:1;text-align:center;font-size:11px;color:var(--t3);padding-bottom:6px">Tap '+esc(S.crMascotName||'your companion')+' to redecorate</div>'+
-          '<div style="width:82px;flex-shrink:0;display:flex;justify-content:flex-end">'+(decor==='lamp'?crLampHtml(p):decor==='fire'?crFireplaceHtml(p):'')+'</div>'+
+          '<div style="display:flex;align-items:flex-end;gap:6px">'+(crHas('plant')?crPlantHtml(S.crPlantStage):'')+'</div>'+
+          '<div style="display:flex;align-items:flex-end;gap:10px">'+(crHas('lamp')?crLampHtml(p):'')+(crHas('fire')?crFireplaceHtml(p):'')+'</div>'+
         '</div></div>'+
         '</div>'+
       '</div></div>'+
-      (decor==='snow'?'<canvas id="cr-snow" class="cr-deco" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0"></canvas>':'')+
+      (crHas('snow')?'<canvas id="cr-snow" class="cr-deco" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0"></canvas>':'')+
       '</div>';
 
     shell(
       '<button class="bk" id="mcbk"><i class="ti ti-arrow-left" style="font-size:18px"></i>Back</button>'+
       '<span class="tbt">comfort room</span>',
       coverBody, true, true);
-    if(decor==='snow')crStartSnow();
+    if(crHas('snow'))crStartSnow();
     var sh=document.querySelector('.shell');if(sh)sh.style.background=p.bg;
     var crtb=document.querySelector('.shell .tb');if(crtb)crtb.style.background=p.bg;
-    Q('mcbk').onclick=function(){if(sh)sh.style.background='';if(crtb)crtb.style.background='';S.crRedecoConfirm=false;S.crDecorOpen=false;S.myCornerTab=null;go('mycorner');};
+    Q('mcbk').onclick=function(){if(sh)sh.style.background='';if(crtb)crtb.style.background='';S.crRedecoConfirm=false;S.myCornerTab=null;go('mycorner');};
 
     /* Redecorate confirmation — an overlay on the shell, never inside the scrolling room */
     if(S.crRedecoConfirm){
       crSheet(
-        '<div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px">Redecorate your room?</div>'+
-        '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.5">This resets your colour and companion. Your memories, affirmations, songs, and notes all stay.</div>'+
+        '<div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px">Change your room?</div>'+
+        '<div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.5">Change your colour, companion, or room elements. Your memories, affirmations, songs, and notes all stay.</div>'+
         '<div style="display:flex;gap:10px">'+
           '<button id="rdno" style="flex:1;padding:11px;background:var(--bg2);color:var(--t2);border:.5px solid var(--bdr);border-radius:12px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Cancel</button>'+
-          '<button id="rdyes" style="flex:1;padding:11px;background:'+p.accent+';color:#fff;border:none;border-radius:12px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Redecorate</button>'+
+          '<button id="rdyes" style="flex:1;padding:11px;background:'+p.accent+';color:#fff;border:none;border-radius:12px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Change my room</button>'+
         '</div>',
         function(){S.crRedecoConfirm=false;drawComfortScrapbook();});
     }
-    /* Decorate picker — adds one element to the room (Redecorate is the companion tap, which resets colour/companion) */
-    if(S.crDecorOpen){
-      var opts=CR_DECOR.concat([{k:'',e:'',n:'None'}]);
-      crSheet(
-        '<div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">Decorate your room</div>'+
-        '<div style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.5">Pick one thing to add. You can change it anytime.</div>'+
-        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px">'+
-          opts.map(function(o){
-            var on=(decor||'')===o.k;
-            return '<button class="cr-dtile'+(on?' on':'')+'" data-decor="'+o.k+'" aria-pressed="'+on+'">'+
-              '<div class="cr-dprev" style="background:'+p.bg+'">'+crDecorPreview(o.k,p)+'</div>'+
-              '<div style="font-size:12px;font-weight:600;color:var(--text);text-align:center;line-height:1.25">'+(o.e?o.e+' ':'')+o.n+'</div>'+
-              (o.hint?'<div style="font-size:10px;color:var(--t2);font-style:italic;text-align:center;line-height:1.2">'+o.hint+'</div>':'')+
-            '</button>';
-          }).join('')+
-        '</div>',
-        function(){S.crDecorOpen=false;drawComfortScrapbook();});
-    }
-
     var comp=Q('cr-companion');if(comp){comp.onclick=function(){S.crRedecoConfirm=true;drawComfortScrapbook();};comp.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();comp.onclick();}};}
     var rdno=Q('rdno');if(rdno)rdno.onclick=function(){S.crRedecoConfirm=false;drawComfortScrapbook();};
-    var rdyes=Q('rdyes');if(rdyes)rdyes.onclick=function(){S.crRedecoConfirm=false;if(sh)sh.style.background='';if(crtb)crtb.style.background='';S.crSetup=false;crLastView=null;drawComfortSetup();};
-    var dec=Q('cr-decor');if(dec)dec.onclick=function(){S.crDecorOpen=true;drawComfortScrapbook();};
-    document.querySelectorAll('[data-decor]').forEach(function(b){b.onclick=function(){S.crDecor=b.dataset.decor||null;S.crDecorOpen=false;saveS();drawComfortScrapbook();};});
+    var rdyes=Q('rdyes');if(rdyes)rdyes.onclick=function(){S.crRedecoConfirm=false;if(sh)sh.style.background='';if(crtb)crtb.style.background='';crOpenSetup(0,false);};
+    var dec=Q('cr-decor');if(dec)dec.onclick=function(){crOpenSetup(2,true);};
 
     document.querySelectorAll('[data-crsec]').forEach(function(b){b.onclick=function(){S.crSection=parseInt(b.dataset.crsec);drawComfortScrapbook();};});
     return;
