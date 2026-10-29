@@ -1,0 +1,13 @@
+# Web build (browser fallback). The native apps never load this site.
+[build]
+  command = "npm run build:release"
+  publish = "www"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Everything is served from this site: no fonts, scripts or icons from third parties.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' blob:; worker-src 'none'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"
+    Permissions-Policy = "camera=(), geolocation=(), microphone=(self)"

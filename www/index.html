@@ -10,8 +10,16 @@
 <meta name="theme-color" content="#fffbf5" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1a1208" media="(prefers-color-scheme: dark)">
 <title>Anxiously Okay</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500&display=swap">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-48.webp" type="image/webp">
+<link rel="stylesheet" href="assets/fonts.css">
+<link rel="stylesheet" href="assets/tabler/tabler-icons.min.css">
+<script src="js/build-flags.js"></script>
+<script>/* native plugin bridge is only needed inside the Capacitor app */
+if(window.Capacitor&&typeof window.Capacitor.isNativePlatform==='function'&&window.Capacitor.isNativePlatform())document.write('<script src="js/capacitor.bundle.js"><\/script>');</script>
+<script src="js/platform.js"></script>
+<script src="js/store.js"></script>
+<script src="js/nudges.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 button,input,textarea,select{font-family:inherit}
@@ -164,6 +172,7 @@ var dark=false;
 /* iOS Safari has no working Web Notifications — detect up front and never call the API there.
    The second clause catches iPadOS 13+, which reports itself as a Mac. */
 var isIOS=(/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+var isIOSWeb=isIOS&&!AOPlatform.isNative(); /* the home-screen note only applies to iPhone Safari, not the app */
 var IOS_NOTIF_MSG='On iPhone, add this app to your home screen to enable reminders.';
 function iosNotifNote(){return '<div style="display:flex;align-items:flex-start;gap:10px;background:var(--bg2);border:.5px solid var(--bdr);border-radius:12px;padding:12px 14px;text-align:left"><i class="ti ti-device-mobile-share" style="font-size:20px;color:var(--acc);flex-shrink:0;margin-top:1px"></i><div style="font-size:13px;color:var(--text);line-height:1.5">'+IOS_NOTIF_MSG+'<div style="font-size:11px;color:var(--t2);margin-top:4px">Tap the Share button in Safari, then <b>Add to Home Screen</b>.</div></div></div>';}
 var EM=['','🌪️','🌥️','⛅️','🌤️','🌞'];
@@ -218,7 +227,8 @@ var CR_MASCOTS=[
   {id:'bear',e:'🐻',name:'Bear',desc:'Steady, grounding'}
 ];
 var PRESET_AFFS=['I am doing the best I can, and that is enough.','This feeling will pass.','I am allowed to take up space.','My anxiety does not define me.','I am worthy of rest and peace.','I am more than my worries.','I choose to be kind to myself today.','I am safe right now.','Progress, not perfection.','My feelings are valid.','I trust myself to handle what comes.','I deserve gentleness.'];
-function mkS(){return{ob:false,obStep:0,obPath:'',name:'',dob:'',emergContact:{name:'',phone:''},notifEnabled:false,notifTime:'09:00',lastNotifDate:'',lastSupNotifDate:'',scr:'mood',mood:null,moodHist:{},streak:0,dump:'',micOn:false,ventDone:false,ventSaved:false,ventLog:[],ventEditIdx:-1,ventHistDate:undefined,supTab:'sos',trickModal:false,tricks:['ground','candy','cold'],customTricks:[],jv:['','',''],jlog:[],winEditIdx:-1,profEdit:false,pName:'',pDob:'',confirmDelete:false,calmTab:'games',unsentComposing:false,unsentDraftTo:'',unsentDraftText:'',unsentMicOn:false,unsentDrawer:[],wcsDraft:'',wcsLog:[],wcsEditIdx:-1,wcsSaved:false,crSetup:false,crColor:'amber',crMascot:null,crMascotName:'',crPhotos:[],crAffirmations:[],crSongs:[],crNotes:[],crOpenDrawers:{photos:false,affirmations:false,songs:false,notes:false},crAffText:'',crSongDraft:{name:'',url:''},crNoteText:'',crNoteDate:'',myCornerTab:null,crPage:0,crSection:null,crRedecoConfirm:false,crAffEditIdx:-1,doodleGallery:[],crVoices:[],crFairyLights:false,crDecorActive:[],crSetupStep:0,crSetupOpen:false,crSetupOnly:false,crPlantStage:0,crPlantLastSeen:''};}
+function aoNudgeDefaults(){return {enabled:true,evening:true,pattern:true,away:true,windDown:'22:00',quietStart:null,quietEnd:'08:00',ignored:{},acted:[],log:[],asked:false,denied:false};}
+function mkS(){return{ob:false,obStep:0,obPath:'',name:'',dob:'',emergContact:{name:'',phone:''},scr:'mood',mood:null,moodHist:{},streak:0,dump:'',micOn:false,ventDone:false,ventSaved:false,ventLog:[],ventEditIdx:-1,ventHistDate:undefined,supTab:'sos',trickModal:false,tricks:['ground','candy','cold'],customTricks:[],jv:['','',''],jlog:[],winEditIdx:-1,profEdit:false,pName:'',pDob:'',confirmDelete:false,calmTab:'games',unsentComposing:false,unsentDraftTo:'',unsentDraftText:'',unsentMicOn:false,unsentDrawer:[],wcsDraft:'',wcsLog:[],wcsEditIdx:-1,wcsSaved:false,crSetup:false,crColor:'amber',crMascot:null,crMascotName:'',crPhotos:[],crAffirmations:[],crSongs:[],crNotes:[],crOpenDrawers:{photos:false,affirmations:false,songs:false,notes:false},crAffText:'',crSongDraft:{name:'',url:''},crNoteText:'',crNoteDate:'',myCornerTab:null,crPage:0,crSection:null,crRedecoConfirm:false,crAffEditIdx:-1,doodleGallery:[],crVoices:[],crFairyLights:false,crDecorActive:[],crSetupStep:0,crSetupOpen:false,crSetupOnly:false,crPlantStage:0,crPlantLastSeen:'',nudge:aoNudgeDefaults()};}
 var S=mkS(),bRAF=null,bPS=null,bPI=0,gLoop=null,ambRAF=null,ambObj={},recog=null;
 var ventCollapsed={};
 var ventSortByDay=false;
@@ -231,11 +241,15 @@ var voiceCache={};
 var voiceRecorder=null,voiceChunks=[],voiceRecording=false,voiceTimer=null,voiceTick=null,voiceStart=0;
 var voiceMsg=null; /* {ok:bool,text:string} — banner on the Voices page */
 var VOICE_MAX_SEC=60,VOICE_MAX_UPLOAD=3*1024*1024,AO_STORE_LIMIT=4.8e6;
-var AO_PERSIST=['name','dob','ob','obPath','moodHist','streak','jlog','ventLog','wcsLog','unsentDrawer','tricks','customTricks','crSetup','crColor','crMascot','crMascotName','crPhotos','crAffirmations','crSongs','crNotes','crVoices','doodleGallery','crDecorActive','crPlantStage','crPlantLastSeen','emergContact','notifEnabled','notifTime','lastNotifDate','lastSupNotifDate'];
-function aoSerialize(){var d={};AO_PERSIST.forEach(function(k){d[k]=S[k];});if(d.crPhotos)d.crPhotos=d.crPhotos.map(function(ph){var c=Object.assign({},ph);delete c.videoUrl;return c;});return JSON.stringify(d);}
-/* Persist state. On failure nothing already saved is touched (the old fallback deleted everything and retried). */
-function aoIsQuota(e){return !!e&&(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED'||e.code===22||e.code===1014);}
-function aoPersist(){try{localStorage.setItem('ao_s',aoSerialize());return {ok:true};}catch(e){return {ok:false,quota:aoIsQuota(e)};}}
+var AO_PERSIST=['name','dob','ob','obPath','moodHist','streak','jlog','ventLog','wcsLog','unsentDrawer','tricks','customTricks','crSetup','crColor','crMascot','crMascotName','crPhotos','crAffirmations','crSongs','crNotes','crVoices','doodleGallery','crDecorActive','crPlantStage','crPlantLastSeen','emergContact','nudge'];
+var aoReady=false;   /* true once the encrypted store has been opened and state loaded */
+function aoStateObj(){var d={};AO_PERSIST.forEach(function(k){d[k]=S[k];});return d;}
+function aoSerialize(){return JSON.stringify(aoStateObj());}
+/* Write now and report the result; used where a change must be confirmed as saved (photos, voices). */
+function aoPersistNow(){
+  if(!AOStore.persistent())return Promise.resolve({ok:false,unavailable:true});
+  return AOStore.writeState(aoStateObj()).then(function(){return {ok:true};},function(e){return {ok:false,quota:AOStore.isQuota(e)};});
+}
 var aoToastAt=0;
 function aoToast(text){
   var sh=Q('msh');if(!sh||Date.now()-aoToastAt<4000)return;aoToastAt=Date.now();
@@ -243,9 +257,46 @@ function aoToast(text){
   t.style.cssText='position:absolute;left:12px;right:12px;top:56px;z-index:130;background:var(--sos);border:1.5px solid var(--sosbdr);color:var(--sosh);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.45;box-shadow:0 4px 14px rgba(0,0,0,.12)';
   t.textContent=text;sh.appendChild(t);setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},4500);
 }
-function saveS(){var r=aoPersist();if(!r.ok&&r.quota)aoToast('Your room is full. Delete a few photos to add more.');return r.ok;}
-function loadS(){try{var d=localStorage.getItem('ao_s');if(d){var p=JSON.parse(d);AO_PERSIST.forEach(function(k){if(p[k]!==undefined)S[k]=p[k];});if(!Array.isArray(p.crDecorActive)){var oldD=p.crDecor!==undefined?p.crDecor:(p.crSetup?(p.crFairyLights?'lights':'plant'):null);S.crDecorActive=oldD?[oldD]:[];}/* one-time migration from the single-choice key */if(S.crPhotos){var dirty=false;S.crPhotos.forEach(function(ph){if(ph.videoUrl){delete ph.videoUrl;dirty=true;}});if(dirty){try{localStorage.removeItem('ao_s');}catch(e){}saveS();}}}}catch(e){}}
+/* Debounced encrypted save of the whole state (300 ms). Errors surface as a toast, never silently. */
+function saveS(){if(aoReady&&AOStore.persistent())AOStore.queueSave(aoStateObj);return true;}
+AOStore.onSaveError(function(e){aoToast(AOStore.isQuota(e)?'Your room is full. Delete a few photos to add more.':'That change couldn\'t be saved just now. Please try again.');});
+/* Apply a loaded state object, including older formats. */
+function aoApplyLoaded(p){
+  if(!p)return;
+  AO_PERSIST.forEach(function(k){if(p[k]!==undefined)S[k]=p[k];});
+  if(!Array.isArray(p.crDecorActive)){var oldD=p.crDecor!==undefined?p.crDecor:(p.crSetup?(p.crFairyLights?'lights':'plant'):null);S.crDecorActive=oldD?[oldD]:[];}
+  if(S.crPhotos)S.crPhotos.forEach(function(ph){delete ph.videoUrl;});
+  var nd=aoNudgeDefaults();S.nudge=Object.assign(nd,S.nudge||{});
+}
 function Q(id){return document.getElementById(id);}
+/* Encrypted media → object URLs, decrypted on demand and cached for the session. Elements carrying
+   data-mid="<id>" get their src filled in as soon as the file is ready. */
+var aoMediaURL={},aoMediaJobs={};
+var AO_BLANK='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+function aoMediaLoad(id,type){
+  if(aoMediaURL[id])return Promise.resolve(aoMediaURL[id]);
+  if(aoMediaJobs[id])return aoMediaJobs[id];
+  aoMediaJobs[id]=AOStore.loadMedia(id,type).then(function(b){
+    var u=URL.createObjectURL(b);aoMediaURL[id]=u;
+    document.querySelectorAll('[data-mid="'+id+'"]').forEach(function(el){el.src=u;});
+    return u;
+  },function(e){delete aoMediaJobs[id];throw e;});
+  return aoMediaJobs[id];
+}
+function aoMediaSrc(id,type){if(!id)return '';if(aoMediaURL[id])return aoMediaURL[id];aoMediaLoad(id,type).catch(function(){});return '';}
+function aoMediaForget(id){if(!id)return;if(aoMediaURL[id]){URL.revokeObjectURL(aoMediaURL[id]);delete aoMediaURL[id];}delete aoMediaJobs[id];}
+/* <img> for a stored image (or an older data: URL) */
+function aoImg(id,legacy,style){var src=legacy||aoMediaSrc(id,'image/jpeg');return '<img '+(id&&!legacy?'data-mid="'+id+'" ':'')+'src="'+(src||AO_BLANK)+'" alt="" style="'+style+'">';}
+function aoPhotoThumbId(ph){return ph.isVideo?ph.t:ph.m;}
+/* Warm in-app message instead of alert(), which native webviews handle poorly */
+function aoAlert(text){
+  var host=Q('msh')||document.body;
+  var ov=document.createElement('div');ov.className='ov';ov.style.alignItems='center';ov.style.justifyContent='center';ov.style.zIndex='140';
+  ov.innerHTML='<div class="mbox" role="alertdialog" style="border-radius:20px;margin:0 18px;max-width:320px;padding:20px 18px"><div style="font-size:14px;color:var(--text);line-height:1.55;margin-bottom:16px"></div><button class="btn" style="padding:11px">Okay</button></div>';
+  ov.querySelector('div div').textContent=text;
+  ov.querySelector('button').onclick=function(){ov.remove();};
+  host.appendChild(ov);
+}
 function fmtVoiceSecs(n){return Math.floor(n/60)+':'+String(n%60).padStart(2,'0');}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function tdKey(){var n=new Date();return n.getFullYear()+'-'+(n.getMonth()+1)+'-'+n.getDate();}
@@ -255,11 +306,24 @@ function greet(){var h=new Date().getHours();return h<12?'Good morning':h<17?'Go
 function dStr(){return new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});}
 function fmtDob(d){if(!d)return'—';var p=d.split('-').map(Number);return new Date(p[0],p[1]-1,p[2]).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});}
 function calcAge(d){if(!d)return null;var p=d.split('-').map(Number),b=new Date(p[0],p[1]-1,p[2]),n=new Date(),a=n.getFullYear()-b.getFullYear();if(n<new Date(n.getFullYear(),b.getMonth(),b.getDate()))a--;return a;}
-function go(s){if(s!=='mood')moodNudge=false;if(s!=='support')stopB();stopGame();stopAmb();S.scr=s;S.trickModal=false;saveS();draw();}
-function logout(){stopB();stopGame();stopAmb();localStorage.removeItem('ao_s');S=mkS();draw();}
+function go(s){if(s!=='mood'){moodNudge=false;aoPatternHint=null;}if(s!=='support')stopB();stopGame();stopAmb();S.scr=s;S.trickModal=false;saveS();draw();}
+/* There are no accounts: "Log out" and "Delete everything" both erase this device's data, so both
+   go through the same confirmation. */
+function logout(){S.confirmDelete=true;S.scr='me';draw();}
+function aoDeleteEverything(){
+  stopB();stopGame();stopAmb();aoReady=false;
+  return Promise.resolve()
+    .then(function(){return AOPlatform.notify.pending().then(function(p){return AOPlatform.notify.cancel(p.map(function(n){return n.id;}));}).catch(function(){});})
+    .then(function(){return AOStore.wipe();})
+    .then(function(){return AOPlatform.storage.clear();})
+    .then(function(){try{localStorage.removeItem('ao_s');}catch(e){}
+      Object.keys(aoMediaURL).forEach(aoMediaForget);
+      S=mkS();return AOStore.init();})
+    .then(function(){aoReady=true;draw();},function(){S=mkS();aoReady=true;draw();});
+}
 function toggleDark(){dark=!dark;draw();}
-function toggleMic(){var SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert('Speech recognition needs Chrome or Safari.');return;}if(S.micOn){if(recog)recog.stop();S.micOn=false;draw();return;}recog=new SR();recog.continuous=false;recog.interimResults=false;recog.lang='en-US';recog.onresult=function(e){S.dump=(S.dump?S.dump+' ':'')+e.results[0][0].transcript;S.micOn=false;draw();};recog.onerror=recog.onend=function(){S.micOn=false;draw();};S.micOn=true;recog.start();draw();}
-function toggleUnsentMic(){var SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert('Speech recognition needs Chrome or Safari.');return;}if(S.unsentMicOn){if(recog)recog.stop();S.unsentMicOn=false;drawCalm();return;}recog=new SR();recog.continuous=false;recog.interimResults=false;recog.lang='en-US';recog.onresult=function(e){S.unsentDraftText=(S.unsentDraftText?S.unsentDraftText+' ':'')+e.results[0][0].transcript;S.unsentMicOn=false;drawCalm();};recog.onerror=recog.onend=function(){S.unsentMicOn=false;drawCalm();};S.unsentMicOn=true;recog.start();drawCalm();}
+function toggleMic(){var SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){aoAlert('Voice typing isn\'t available here. You can type instead — it works just the same.');return;}if(S.micOn){if(recog)recog.stop();S.micOn=false;draw();return;}recog=new SR();recog.continuous=false;recog.interimResults=false;recog.lang='en-US';recog.onresult=function(e){S.dump=(S.dump?S.dump+' ':'')+e.results[0][0].transcript;S.micOn=false;draw();};recog.onerror=recog.onend=function(){S.micOn=false;draw();};S.micOn=true;recog.start();draw();}
+function toggleUnsentMic(){var SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){aoAlert('Voice typing isn\'t available here. You can type instead — it works just the same.');return;}if(S.unsentMicOn){if(recog)recog.stop();S.unsentMicOn=false;drawCalm();return;}recog=new SR();recog.continuous=false;recog.interimResults=false;recog.lang='en-US';recog.onresult=function(e){S.unsentDraftText=(S.unsentDraftText?S.unsentDraftText+' ':'')+e.results[0][0].transcript;S.unsentMicOn=false;drawCalm();};recog.onerror=recog.onend=function(){S.unsentMicOn=false;drawCalm();};S.unsentMicOn=true;recog.start();drawCalm();}
 
 /* ── Ambient mood animations (auto-stop after 10s) ── */
 function stopAmb(){if(ambRAF){cancelAnimationFrame(ambRAF);ambRAF=null;}ambObj={};var c=Q('amb');if(c){c.classList.remove('on');var ctx=c.getContext('2d');if(ctx)ctx.clearRect(0,0,c.width,c.height);}}
@@ -521,22 +585,20 @@ function drawOb(){
       '<div style="font-size:44px;margin-bottom:16px">🔔</div>'+
       '<div class="serif" style="font-size:26px;font-style:italic;color:var(--text);text-align:center;line-height:1.25;margin-bottom:10px">Can I check in<br>on you?</div>'+
       '<div style="font-size:13px;color:var(--t2);text-align:center;margin-bottom:28px;line-height:1.6">I\'ll send a gentle nudge to log your mood each day — just one, at a time you choose. No spam, ever.</div>'+
-      (isIOS?
+      (isIOSWeb?
         '<div style="width:100%;margin-bottom:20px">'+iosNotifNote()+'</div>'+
         '<button class="btn" id="ob-notif-skip">Got it</button>':
-        '<div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;align-self:flex-start;width:100%">What time works best?</div>'+
-        '<input type="time" id="ob-notif-time" class="inp" value="'+(S.notifTime||'09:00')+'" style="margin-bottom:20px;width:100%;box-sizing:border-box;color-scheme:'+(dark?'dark':'light')+'">'+
+        '<div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;align-self:flex-start;width:100%">When does your day usually wind down?</div>'+
+        '<input type="time" id="ob-notif-time" class="inp" value="'+(S.nudge.windDown||'22:00')+'" style="margin-bottom:20px;width:100%;box-sizing:border-box;color-scheme:'+(dark?'dark':'light')+'">'+
         '<button class="btn" id="ob-notif-yes">Remind me 🔔</button>'+
         '<button id="ob-notif-skip" style="background:none;border:none;color:var(--t3);font-family:\'DM Sans\',sans-serif;font-size:13px;cursor:pointer;margin-top:12px;text-decoration:underline">Maybe later</button>')+
     '</div></div>';
     function goFinal(){S.obStep=0;if(S.obPath==='overwhelmed'){S.scr='comfort';draw();}else if(S.obPath==='overthinking'){S.myCornerTab=null;S.scr='mycorner';draw();}else{draw();}}
     var onYes=Q('ob-notif-yes');if(onYes)onYes.onclick=function(){
-      var t=Q('ob-notif-time');S.notifTime=(t?t.value:'')||'09:00';
-      if(typeof Notification!=='undefined'){
-        Notification.requestPermission().then(function(perm){S.notifEnabled=(perm==='granted');saveS();goFinal();});
-      } else {goFinal();}
+      /* store the time only — the system permission prompt comes later, in context, after the first mood log */
+      var t=Q('ob-notif-time');S.nudge.windDown=(t?t.value:'')||'22:00';S.nudge.enabled=true;saveS();goFinal();
     };
-    Q('ob-notif-skip').onclick=function(){S.notifEnabled=false;saveS();goFinal();};
+    Q('ob-notif-skip').onclick=function(){S.nudge.enabled=false;saveS();goFinal();};
   } else {
     /* ── Name collection ── */
     Q('sw').innerHTML='<div class="shell'+(dark?' dark':'')+'" id="msh"><div class="ob" style="background:'+bg+';justify-content:center;gap:0;padding:32px 24px">'+
@@ -553,46 +615,167 @@ function drawOb(){
     var n=Q('on'),d=Q('od'),g=Q('og');
     function ck(){g.disabled=!n.value.trim();}
     n.oninput=ck;d.oninput=ck;
-    function finishOb(nm,dv){S.name=nm;if(dv)S.dob=dv;S.ob=true;saveS();if(isIOS||(typeof Notification!=='undefined'&&Notification.permission!=='denied')){S.obStep=2;drawOb();}else{S.obStep=0;if(S.obPath==='overwhelmed'){S.scr='comfort';draw();}else{draw();}}}
+    function finishOb(nm,dv){S.name=nm;if(dv)S.dob=dv;S.ob=true;saveS();if(isIOSWeb||AOPlatform.notify.supported()){S.obStep=2;drawOb();}else{S.obStep=0;if(S.obPath==='overwhelmed'){S.scr='comfort';draw();}else{draw();}}}
     g.onclick=function(){var nv=n.value.trim(),dv=d.value;if(nv)finishOb(nv,dv);};
     Q('ob-skip').onclick=function(){finishOb('friend','');};
     var obbk=Q('ob-back-btn');if(obbk)obbk.onclick=function(){S.obStep=0;if(S.ob&&(S.obPath==='stressed'||S.obPath==='overwhelmed'||S.obPath==='overthinking')){draw();}else{S.ob=false;drawOb();}};
   }
 }
 
-/* ── NOTIFICATIONS ── */
-function checkDailyNotif(){
-  if(isIOS||!S.notifEnabled)return;
-  if(typeof Notification==='undefined'||Notification.permission!=='granted')return;
-  var now=new Date();
-  var pad=function(n){return n<10?'0'+n:''+n;};
-  var todayStr=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());
-  var parts=(S.notifTime||'09:00').split(':');
-  var nh=parseInt(parts[0])||9,nm2=parseInt(parts[1])||0;
-  if(now.getHours()<nh||(now.getHours()===nh&&now.getMinutes()<nm2))return;
-  /* Mood reminder */
-  var todayArr=getMoodArr(todayStr),logged=todayArr&&todayArr.length>0;
-  if(S.lastNotifDate!==todayStr&&!logged){
-    try{new Notification('Anxiously Okay',{body:'Hey '+(S.name||'there')+'. How are you feeling today? No pressure — I\'m just checking in.',icon:'/favicon.ico'});}catch(e){}
-    S.lastNotifDate=todayStr;saveS();
-  }
-  /* 3 tough days notification */
-  if(S.lastSupNotifDate!==todayStr){
-    var hard=0;
-    for(var i=1;i<=3;i++){
-      var dt=new Date(now);dt.setDate(dt.getDate()-i);
-      var ds=dt.getFullYear()+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate());
-      var arr=getMoodArr(ds);
-      if(arr&&arr.length>0&&arr.every(function(e){return e.mood<=2;}))hard++;
-    }
-    if(hard>=3){
-      var msgs=['You\'ve had a tough few days. Writing it out might help — try the vent or a letter.','You\'ve been carrying a lot lately. Come breathe with us whenever you\'re ready.','Three hard days in a row. You don\'t have to figure it all out today — just breathe.'];
-      var msg=msgs[Math.floor(Math.random()*msgs.length)];
-      setTimeout(function(){try{new Notification('Anxiously Okay',{body:msg,icon:'/favicon.ico'});}catch(e){}},4000);
-      S.lastSupNotifDate=todayStr;saveS();
-    }
-  }
+/* ── REMINDERS, PRIVACY, NOTIFICATION ACTIONS ── */
+var aoPatternHint=null,aoNotifPerm='prompt',aoLockInfo={available:false,kind:''},aoTz='';
+var AO_DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+/* timed mood logs only (the timestamp must fall on the entry's own day) */
+function aoMoodLogs(){
+  var out=[];
+  Object.keys(S.moodHist||{}).forEach(function(k){
+    var p=k.split('-').map(Number);
+    getMoodArr(k).forEach(function(e){
+      if(!e||!(e.ts>0))return;var d=new Date(e.ts);
+      if(d.getFullYear()===p[0]&&d.getMonth()+1===p[1]&&d.getDate()===p[2])out.push({ts:e.ts,mood:e.mood});
+    });
+  });
+  return out;
 }
+function aoNudgeAdapter(){return {notify:AOPlatform.notify,now:aoNow,state:function(){return S.nudge;},logs:aoMoodLogs,persist:saveS};}
+function aoReschedule(){
+  if(!aoReady)return Promise.resolve([]);
+  return AOPlatform.notify.permission().then(function(perm){aoNotifPerm=perm;return AONudges.rescheduleAll(aoNudgeAdapter());}).catch(function(){return [];});
+}
+function aoKeyOf(ts){var d=new Date(ts);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+/* write a mood with its original timestamp (used by notification buttons and dev tools) */
+function aoLogMood(mood,ts,extra){
+  var k=aoKeyOf(ts),arr=getMoodArr(k),first=arr.length===0;
+  var e={mood:mood,ts:ts};if(extra)Object.keys(extra).forEach(function(x){e[x]=extra[x];});
+  arr.push(e);S.moodHist[k]=arr;if(first&&k===tdKey())S.streak++;
+}
+function aoAfterMoodLog(){
+  AOPlatform.haptic('light');
+  aoReschedule();
+  if(!S.nudge.asked&&!isIOSWeb&&AOPlatform.notify.supported())setTimeout(aoAskReminders,700);
+}
+/* Asked once, in context, after the first mood log — with a plain explanation before the system prompt */
+function aoAskReminders(){
+  S.nudge.asked=true;saveS();
+  AOPlatform.notify.permission().then(function(perm){
+    aoNotifPerm=perm;
+    if(perm==='granted'){aoReschedule();return;}
+    if(perm!=='prompt'){S.nudge.denied=perm==='denied';saveS();return;}
+    var sh=Q('msh');if(!sh)return;
+    crSheet('<div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px">Would a gentle reminder help?</div>'+
+      '<div style="font-size:13px;color:var(--t2);line-height:1.55;margin-bottom:16px">I can send one quiet check-in a day, around when your day winds down. Reminders never say how you\'ve been feeling, and you can change them any time in Me.</div>'+
+      '<div style="display:flex;gap:10px"><button id="ao-rem-no" class="btng" style="padding:11px;font-size:14px">Not now</button><button id="ao-rem-yes" class="btn" style="padding:11px;font-size:14px">Yes, remind me</button></div>',
+      function(){var o=document.querySelector('.cr-sheet-ov');if(o)o.remove();});
+    Q('ao-rem-no').onclick=function(){var o=document.querySelector('.cr-sheet-ov');if(o)o.remove();};
+    Q('ao-rem-yes').onclick=function(){
+      var o=document.querySelector('.cr-sheet-ov');if(o)o.remove();
+      AOPlatform.notify.request().then(function(r){aoNotifPerm=r;S.nudge.denied=r==='denied';if(r==='granted')S.nudge.enabled=true;saveS();aoReschedule();});
+    };
+  });
+}
+function aoDrainActions(){
+  if(!aoReady||Q('ao-lock')||!aoPendingActions.length)return;
+  var list=aoPendingActions.splice(0);
+  list.forEach(function(a){
+    var ex=a.extra||{};
+    if(a.id&&S.nudge.acted.indexOf(a.id)<0)S.nudge.acted.push(a.id);
+    var m=/^mood-(\d)$/.exec(a.actionId||'');
+    if(m)aoLogMood(parseInt(m[1],10),a.at,{via:'notification'});
+    if(ex.type==='pattern')aoPatternHint={weekday:ex.weekday,minutes:ex.minutes};
+  });
+  S.scr='mood';S.mood=null;saveS();draw();aoReschedule();
+}
+function aoPatternHintHtml(){
+  if(!aoPatternHint||aoPatternHint.weekday==null)return '';
+  var mins=aoPatternHint.minutes||1020,part=mins<720?'morning':mins<1020?'afternoon':'evening';
+  return '<div class="mc-fade" style="display:flex;gap:10px;align-items:flex-start;background:var(--bg2);border:.5px solid var(--bdr);border-radius:14px;padding:12px;margin-bottom:14px">'+
+    '<div style="flex:1"><div class="serif" style="font-size:13px;font-style:italic;color:var(--text);line-height:1.5;margin-bottom:8px">'+AO_DAYS[aoPatternHint.weekday]+' '+part+'s have felt heavy lately. Want to try the breathing page?</div>'+
+    '<button id="ao-ph-go" style="background:none;border:1.5px solid var(--gbdr);color:var(--gt);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">Breathe with me →</button></div>'+
+    '<button id="ao-ph-x" aria-label="Dismiss" style="background:none;border:none;color:var(--t3);font-size:16px;cursor:pointer">&#215;</button></div>';
+}
+function aoNotifStart(){
+  aoTz=aoTzSig();
+  AOPlatform.lock.check().then(function(r){aoLockInfo=r;});
+  AOPlatform.notify.registerActions([{id:AONudges.ACTION_TYPE,actions:[
+    {id:'mood-2',title:'🌥️ Heavy',foreground:true},{id:'mood-3',title:'⛅ Steady',foreground:true},{id:'mood-5',title:'🌞 Radiant',foreground:true}]}]).catch(function(){});
+  aoDrainActions();aoReschedule().then(function(){if(S.scr==='me')drawMe();});
+  /* time zone changes: re-plan on the device's new local clock */
+  setInterval(function(){var t=aoTzSig();if(t!==aoTz){aoTz=t;aoReschedule();}},5*60000);
+}
+function aoTzSig(){var tz='';try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){}return tz+'|'+new Date().getTimezoneOffset();}
+/* capture notification taps as early as possible; they are applied once the store is open and unlocked */
+AOPlatform.notify.onAction(function(a){aoPendingActions.push(a);aoDrainActions();});
+
+/* Me: reminder settings */
+function aoSwitch(id,on,label){return '<button id="'+id+'" class="cr-switch" role="switch" aria-checked="'+(on?'true':'false')+'" aria-label="'+label+'" style="background:'+(on?'var(--grn)':'var(--bdr)')+'"><span style="left:'+(on?'23px':'3px')+'"></span></button>';}
+function aoRow(title,sub,ctrl){return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:.5px solid var(--bdr)"><div style="min-width:0"><div style="font-size:13px;font-weight:500;color:var(--text)">'+title+'</div>'+(sub?'<div style="font-size:11px;color:var(--t2);line-height:1.45;margin-top:2px">'+sub+'</div>':'')+'</div>'+ctrl+'</div>';}
+function aoTimeInput(id,val){return '<input type="time" id="'+id+'" value="'+val+'" style="background:var(--bg);border:.5px solid var(--bdr);border-radius:8px;padding:5px 8px;font-size:13px;color:var(--text);color-scheme:'+(dark?'dark':'light')+'">';}
+function aoMeReminders(){
+  var n=S.nudge,head='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:16px">🔔</span><div style="font-size:13px;font-weight:600;color:var(--text)">Reminders</div></div>';
+  var box='<div style="background:var(--bg2);border-radius:12px;padding:14px;border:.5px solid var(--bdr);margin-bottom:10px">'+head;
+  if(isIOSWeb)return box+iosNotifNote()+'</div>';
+  if(!AOPlatform.notify.supported())return box+'<div style="font-size:12px;color:var(--t2);line-height:1.5">Reminders aren\'t available in this browser.</div></div>';
+  var qs=n.quietStart||AONudges.fmtMin(AONudges.toMin(n.windDown)+30);
+  return box+
+    (aoNotifPerm==='denied'?'<div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:8px">Turn on reminders in Settings</div>':
+     aoNotifPerm!=='granted'?'<button id="me-rem-on" class="btng" style="padding:10px;font-size:13px;margin-bottom:8px">Turn on reminders</button>':'')+
+    aoRow('Evening check-in','One gentle nudge if you haven\'t checked in.',aoSwitch('me-n-evening',n.evening!==false,'Evening check-in'))+
+    aoRow('Pattern nudges','A little earlier on days that have felt heavy before.',aoSwitch('me-n-pattern',n.pattern!==false,'Pattern nudges'))+
+    aoRow('Check-ins if I\'ve been away','After 3, 7 and 14 days, then they stop.',aoSwitch('me-n-away',n.away!==false,'Check-ins if I\'ve been away'))+
+    aoRow('When does your day usually wind down?','',aoTimeInput('me-n-wind',n.windDown||'22:00'))+
+    aoRow('Quiet hours','Nothing is sent in this window.','<div style="display:flex;align-items:center;gap:6px">'+aoTimeInput('me-n-qs',qs)+'<span style="color:var(--t3);font-size:12px">to</span>'+aoTimeInput('me-n-qe',n.quietEnd||'08:00')+'</div>')+
+    '<div style="font-size:11px;color:var(--t3);line-height:1.5;padding-top:8px;border-top:.5px solid var(--bdr)">Patterns are worked out on this phone and never sent anywhere.</div>'+
+  '</div>';
+}
+/* Me: privacy */
+function aoMePrivacy(){
+  return '<div style="background:var(--bg2);border-radius:12px;padding:14px;border:.5px solid var(--bdr);margin-bottom:10px">'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:16px">🔒</span><div style="font-size:13px;font-weight:600;color:var(--text)">Privacy</div></div>'+
+    (AOPlatform.isNative()&&aoLockInfo.available?aoRow('App lock','Ask for '+(aoLockInfo.kind&&aoLockInfo.kind!=='passcode'?aoLockInfo.kind+' or ':'')+'your passcode when the app opens, and after a minute away.',aoSwitch('me-lock',aoLockOn,'App lock')):'')+
+    '<button id="me-export" class="btng" style="padding:10px;font-size:13px;margin-top:6px">Export my data</button>'+
+    '<div style="font-size:11px;color:var(--t2);line-height:1.5;margin-top:10px">Everything stays on this phone. If you lose or reset your phone, your entries can\'t be recovered.</div>'+
+  '</div>';
+}
+function aoExport(){
+  var d=aoStateObj();
+  /* photos, videos and voice notes are listed by reference only */
+  var data=JSON.parse(JSON.stringify(d));
+  (data.crPhotos||[]).forEach(function(ph){var r={id:ph.id,type:ph.isVideo?'video':'photo'};if(ph.w)r.width=ph.w;if(ph.h)r.height=ph.h;Object.keys(ph).forEach(function(k){delete ph[k];});Object.assign(ph,r);});
+  (data.crVoices||[]).forEach(function(v){delete v.m;delete v.data;v.type='voice note';});
+  (data.doodleGallery||[]).forEach(function(g){delete g.url;g.type='drawing';});
+  if(data.nudge){delete data.nudge.log;delete data.nudge.acted;}
+  var out={app:'Anxiously Okay',schemaVersion:AOStore.SCHEMA,exportedAt:new Date().toISOString(),note:'Photos, videos, drawings and voice notes are listed by reference; the files themselves stay on this device.',data:data};
+  var t=new Date(),name='anxiously-okay-export-'+t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')+'.json';
+  return AOPlatform.share.file(name,JSON.stringify(out,null,2));
+}
+function aoBindMe(){
+  var n=S.nudge;
+  function set(k,v,resetTypes){n[k]=v;(resetTypes||[]).forEach(function(t){n.ignored[t]=0;});saveS();aoReschedule();drawMe();}
+  var on=Q('me-rem-on');if(on)on.onclick=function(){S.nudge.asked=true;AOPlatform.notify.request().then(function(r){aoNotifPerm=r;n.denied=r==='denied';if(r==='granted')n.enabled=true;saveS();aoReschedule();drawMe();});};
+  var e=Q('me-n-evening');if(e)e.onclick=function(){set('evening',n.evening===false,['daily','dayAfter']);};
+  var pt=Q('me-n-pattern');if(pt)pt.onclick=function(){set('pattern',n.pattern===false,['pattern']);};
+  var aw=Q('me-n-away');if(aw)aw.onclick=function(){set('away',n.away===false,['away']);};
+  var w=Q('me-n-wind');if(w)w.onchange=function(){if(w.value)set('windDown',w.value);};
+  var qs=Q('me-n-qs');if(qs)qs.onchange=function(){if(qs.value)set('quietStart',qs.value);};
+  var qe=Q('me-n-qe');if(qe)qe.onchange=function(){if(qe.value)set('quietEnd',qe.value);};
+  var lk=Q('me-lock');if(lk)lk.onclick=function(){
+    var want=!aoLockOn;
+    /* confirm with the device before turning the lock on or off */
+    AOPlatform.lock.authenticate(want?'Turn on app lock':'Turn off app lock').then(function(ok){
+      if(!ok)return;aoLockOn=want;AOPlatform.storage.set('lock',want?'1':'0');drawMe();
+    });
+  };
+  var ex=Q('me-export');if(ex)ex.onclick=function(){ex.disabled=true;aoExport().then(function(){ex.disabled=false;},function(){ex.disabled=false;aoToast('Your data couldn\'t be exported just now. Please try again.');});};
+  var ver=Q('me-version'),taps=0,tt=null;
+  if(ver)ver.onclick=function(){taps++;clearTimeout(tt);tt=setTimeout(function(){taps=0;},2500);if(taps>=7){taps=0;if(window.AODev)AODev.open();}};
+}
+/* hooks for the developer tools (only shipped in dev/beta builds) */
+window.AOApp={
+  state:function(){return S;},draw:function(){draw();},saveNow:function(){return aoPersistNow();},
+  reschedule:function(){return aoReschedule();},now:aoNow,
+  setOffset:function(ms){aoDevOffset=ms||0;},offset:function(){return aoDevOffset;},
+  logMood:aoLogMood,moodLogs:aoMoodLogs,keyOf:aoKeyOf
+};
 
 /* ── MOOD ── */
 function getInsight(){
@@ -646,6 +829,7 @@ function drawMood(){
     '<div class="serif" style="font-size:22px;color:var(--text);margin-bottom:6px;line-height:1.3">'+greet()+', <em>'+S.name+'</em>.<br>How are you feeling?</div>'+
     '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t2);margin-bottom:16px;line-height:1.5">Some days are heavy. Some days are light. Log it as it is — no day has to make sense.</div>'+
     '<div style="display:flex;gap:8px;margin-bottom:18px"><div class="stat"><div class="serif" style="font-size:22px;color:var(--text)">'+S.streak+'</div><div style="font-size:10px;color:var(--t2);margin-top:2px">days in a row</div></div><div class="stat"><div class="serif" style="font-size:22px;color:var(--text)">'+ec+'</div><div style="font-size:10px;color:var(--t2);margin-top:2px">days checked in</div></div></div>'+
+    aoPatternHintHtml()+
     '<div style="display:flex;gap:5px;margin-bottom:16px">'+btns+'</div>'+
     (moodNudge&&(dispM===1||dispM===2)?
       '<div class="mc-fade" style="display:flex;align-items:center;gap:10px;background:var(--bg2);border:.5px solid var(--bdr);border-radius:14px;padding:11px 12px;margin:-4px 0 14px">'+
@@ -679,6 +863,8 @@ function drawMood(){
   if(dispM)setTimeout(function(){startAmb(dispM);},50);
   var mobBk=Q('mob-bk');if(mobBk)mobBk.onclick=function(){S.ob=false;S.obStep=0;drawOb();};
   var vb=Q('vbdg');if(vb)vb.onclick=function(){go('venthistory');};
+  var phb=Q('ao-ph-go');if(phb)phb.onclick=function(){aoPatternHint=null;go('support');};
+  var phx=Q('ao-ph-x');if(phx)phx.onclick=function(){aoPatternHint=null;drawMood();};
   var mnud=Q('mood-nudge');if(mnud)mnud.onclick=function(){S.myCornerTab=null;go('mycorner');};
   document.querySelectorAll('.mb').forEach(function(b){b.onclick=function(){var v=parseInt(b.dataset.m);S.mood=v;moodNudge=(v<=2);if(todayM)S.moodHist[tdKey()]=v;startAmb(v);drawMood();};});
   document.querySelectorAll('[data-mdate]').forEach(function(b){
@@ -708,13 +894,13 @@ function drawMood(){
       ov.querySelector('#pp-save').onclick=function(){
         if(!pickedM)return;
         var arr2=getMoodArr(dkey);arr2.push({mood:pickedM,ts:Date.now()});
-        S.moodHist[dkey]=arr2;saveS();sh.removeChild(ov);drawMood();
+        S.moodHist[dkey]=arr2;saveS();sh.removeChild(ov);drawMood();aoAfterMoodLog();
       };
       ov.onclick=function(e){if(e.target===ov)sh.removeChild(ov);};
       sh.appendChild(ov);
     };
   });
-  var ms=Q('ms');if(ms)ms.onclick=function(){if(!S.mood)return;var tk2=tdKey();var arr=getMoodArr(tk2);var isFirst=arr.length===0;arr.push({mood:S.mood,ts:Date.now()});S.moodHist[tk2]=arr;if(isFirst)S.streak++;saveS();drawMood();};
+  var ms=Q('ms');if(ms)ms.onclick=function(){if(!S.mood)return;var tk2=tdKey();var arr=getMoodArr(tk2);var isFirst=arr.length===0;arr.push({mood:S.mood,ts:Date.now()});S.moodHist[tk2]=arr;if(isFirst)S.streak++;saveS();drawMood();aoAfterMoodLog();};
   var dt=Q('dt');if(dt)dt.oninput=function(e){S.dump=e.target.value;S.ventDone=false;S.ventSaved=false;};
   var mic=Q('mic');if(mic)mic.onclick=toggleMic;
   var vs=Q('vs');if(vs)vs.onclick=function(){
@@ -969,35 +1155,28 @@ function drawWins(){
 function drawMe(){
   var a=calcAge(S.dob);
   var delSec=S.confirmDelete?
-    '<div style="background:var(--sos);border-radius:12px;padding:14px;margin-bottom:14px;border:.5px solid var(--sosbdr)"><div style="font-size:13px;color:var(--sosh);font-weight:500;margin-bottom:5px">Delete account?</div><div style="font-size:12px;color:var(--sost);margin-bottom:12px;line-height:1.5">Everything you\'ve written and saved here will be gone for good. This can\'t be undone.</div><div style="display:flex;gap:8px"><button class="btng" id="del-no">Cancel</button><button id="del-yes" style="flex:1;padding:12px;background:var(--acc);color:#fff;border:none;border-radius:12px;font-family:\'DM Sans\',sans-serif;font-size:14px;font-weight:500;cursor:pointer">Yes, delete</button></div></div>':
-    '<button id="del-btn" style="width:100%;padding:13px;background:var(--bg);color:var(--t2);border:.5px solid var(--bdr);border-radius:12px;font-family:\'DM Sans\',sans-serif;font-size:14px;cursor:pointer;margin-bottom:14px">Delete account</button>';
+    '<div style="background:var(--sos);border-radius:12px;padding:14px;margin-bottom:14px;border:.5px solid var(--sosbdr)"><div style="font-size:13px;color:var(--sosh);font-weight:500;margin-bottom:5px">Delete everything?</div><div style="font-size:12px;color:var(--sost);margin-bottom:12px;line-height:1.5">This erases your entries, photos, voice notes and reminders from this phone, along with the key that protects them. It can\'t be undone.</div><div style="display:flex;gap:8px"><button class="btng" id="del-no">Cancel</button><button id="del-yes" style="flex:1;padding:12px;background:var(--acc);color:#fff;border:none;border-radius:12px;font-family:\'DM Sans\',sans-serif;font-size:14px;font-weight:500;cursor:pointer">Yes, delete everything</button></div></div>':
+    '<button id="del-btn" style="width:100%;padding:13px;background:var(--bg);color:var(--t2);border:.5px solid var(--bdr);border-radius:12px;font-family:\'DM Sans\',sans-serif;font-size:14px;cursor:pointer;margin-bottom:14px">Delete everything</button>';
   shell('<button class="bk" id="meb"><i class="ti ti-arrow-left" style="font-size:18px"></i>Back</button><span class="tbt">me</span>',
     '<div style="text-align:center;padding:20px 0 16px"><div style="width:68px;height:68px;border-radius:50%;background:var(--gbg);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 10px">🌿</div><div class="serif" style="font-size:22px;color:var(--text)">'+S.name+'</div>'+(a!==null?'<div style="font-size:13px;color:var(--t2);margin-top:3px">'+a+' years old</div>':'')+'</div>'+
     (!S.profEdit?
       '<div style="border-top:.5px solid var(--bdr);padding-top:4px;margin-bottom:20px">'+[['Name',S.name],['Date of Birth',fmtDob(S.dob)],['Age',a!==null?a+' years old':'—']].map(function(r){return '<div class="pfield"><div class="pl">'+r[0]+'</div><div class="pv">'+r[1]+'</div></div>';}).join('')+'</div><button class="btn" id="pfe" style="margin-bottom:12px">Edit profile</button>':
       '<div style="margin-bottom:.9rem"><div style="font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Name</div><input class="inp" id="pen" value="'+S.pName+'"></div><div style="margin-bottom:18px"><div style="font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Date of Birth</div><input class="inp" id="ped" type="date" value="'+S.pDob+'" style="color-scheme:'+(dark?'dark':'light')+'"></div><div style="display:flex;gap:10px;margin-bottom:16px"><button class="btng" id="pec">Cancel</button><button class="btn" id="pes">Save</button></div>')+
     '<button id="plo" style="width:100%;padding:13px;background:var(--bg);color:var(--acc);border:1.5px solid var(--sosbdr);border-radius:12px;font-family:\'DM Sans\',sans-serif;font-size:15px;font-weight:500;cursor:pointer;margin-bottom:10px">Log out</button>'+
+    aoMeReminders()+
+    aoMePrivacy()+
     delSec+
-    '<div style="background:var(--bg2);border-radius:12px;padding:14px;border:.5px solid var(--bdr);margin-bottom:10px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">🔔</span><div style="font-size:13px;font-weight:600;color:var(--text)">Daily check-in</div></div>'+(isIOS?'':'<button id="notif-toggle" style="width:44px;height:24px;border-radius:12px;border:none;cursor:pointer;background:'+(S.notifEnabled?'var(--grn)':'var(--bdr)')+';position:relative;flex-shrink:0;transition:background .2s"><span style="position:absolute;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s;left:'+(S.notifEnabled?'23px':'3px')+'"></span></button>')+'</div>'+
-    (isIOS?iosNotifNote():
-    '<div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:'+(S.notifEnabled?'12px':'0')+'">If you haven\'t checked in by this time, I\'ll send one gentle nudge. Just one a day.</div>')+
-    (S.notifEnabled&&!isIOS?'<div style="display:flex;align-items:center;gap:10px"><div style="font-size:12px;color:var(--t2);flex:1">Reminder time</div><input type="time" id="notif-time-input" value="'+(S.notifTime||'09:00')+'" style="background:var(--bg);border:.5px solid var(--bdr);border-radius:8px;padding:5px 8px;font-family:\'DM Sans\',sans-serif;font-size:13px;color:var(--text);color-scheme:'+(dark?'dark':'light')+'"><button id="notif-save" style="background:var(--grn);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif">Save</button></div>':'')+
-    '</div>'+
-    '<div style="background:var(--bg2);border-radius:12px;padding:13px;border:.5px solid var(--bdr)"><div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:4px">About Anxiously Okay</div><div style="font-size:12px;color:var(--t2);line-height:1.6">I\'m here for the in-between moments. I\'m not a replacement for a therapist or doctor — if things feel like too much, please reach out to one.</div></div>',true);
+    '<div style="background:var(--bg2);border-radius:12px;padding:13px;border:.5px solid var(--bdr)"><div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:4px">About Anxiously Okay</div><div style="font-size:12px;color:var(--t2);line-height:1.6">I\'m here for the in-between moments. I\'m not a replacement for a therapist or doctor — if things feel like too much, please reach out to one.</div></div>'+
+    '<div id="me-version" style="text-align:center;font-size:11px;color:var(--t3);padding:16px 0 6px;user-select:none">Version '+((window.AO_BUILD&&AO_BUILD.version)||'1.0.0')+'</div>',true);
   Q('meb').onclick=function(){go('mood');};
   Q('plo').onclick=logout;
   var dBtn=Q('del-btn');if(dBtn)dBtn.onclick=function(){S.confirmDelete=true;drawMe();};
   var dNo=Q('del-no');if(dNo)dNo.onclick=function(){S.confirmDelete=false;drawMe();};
-  var dYes=Q('del-yes');if(dYes)dYes.onclick=function(){S.confirmDelete=false;logout();};
+  var dYes=Q('del-yes');if(dYes)dYes.onclick=function(){S.confirmDelete=false;dYes.disabled=true;aoDeleteEverything();};
   var pfe=Q('pfe');if(pfe)pfe.onclick=function(){S.profEdit=true;S.pName=S.name;S.pDob=S.dob;drawMe();};
   var pec=Q('pec');if(pec)pec.onclick=function(){S.profEdit=false;drawMe();};
   var pes=Q('pes');if(pes)pes.onclick=function(){var n2=Q('pen'),d2=Q('ped');if(n2&&n2.value.trim())S.name=n2.value.trim();if(d2&&d2.value)S.dob=d2.value;S.profEdit=false;drawMe();};
-  var ntog=Q('notif-toggle');if(ntog)ntog.onclick=function(){
-    if(!S.notifEnabled&&typeof Notification!=='undefined'&&Notification.permission!=='granted'&&Notification.permission!=='denied'){
-      Notification.requestPermission().then(function(perm){S.notifEnabled=(perm==='granted');saveS();drawMe();});
-    } else {S.notifEnabled=!S.notifEnabled;saveS();drawMe();}
-  };
-  var nsave=Q('notif-save');if(nsave)nsave.onclick=function(){var ti=Q('notif-time-input');if(ti)S.notifTime=ti.value||'09:00';saveS();drawMe();};
+  aoBindMe();
 }
 
 /* ── GAMES ── */
@@ -1671,86 +1850,95 @@ function crPhotoMsgHtml(){
 function crIsVideo(f){return /^video\//.test(f.type||'')||/\.(mp4|mov|m4v|webm|3gp)$/i.test(f.name||'');}
 /* Reads, compresses and stores picked files. Each file reports back exactly once; nothing is shown
    until it has actually been saved, and every failure ends in a visible message. */
+function crCanvasBlob(cvs,q){return new Promise(function(res){try{cvs.toBlob(function(b){res(b);},'image/jpeg',q);}catch(e){res(null);}});}
 function handleCrFiles(fileList){
   var files=Array.prototype.slice.call(fileList||[]);if(!files.length)return;
-  var results=new Array(files.length),done=0,failed=0,tooBig=0;
+  if(!AOStore.persistent()){crSetPhotoMsg(false,'Your memories can\'t be saved here. Open the app in your browser to keep them.',false);return;}
+  var results=new Array(files.length),done=0,failed=0,tooBig=0,full=0;
   crSetPhotoMsg(true,'Adding '+(files.length===1?'your memory':files.length+' memories')+'…',false);
   function finish(i,entry,why){
     if(results[i]!==undefined)return;
-    results[i]=entry||null;if(!entry){if(why==='big')tooBig++;else failed++;}
+    results[i]=entry||null;if(!entry){if(why==='big')tooBig++;else if(why==='full')full++;else failed++;}
     if(++done===files.length)commit();
+  }
+  function stored(i,entry,mids){
+    /* encrypt + write every file for this memory before it can appear */
+    return Promise.all(mids.map(function(x){return AOStore.saveMedia(x.id,x.blob);})).then(function(){finish(i,entry);},function(e){
+      mids.forEach(function(x){AOStore.removeMedia(x.id);});finish(i,null,AOStore.isQuota(e)?'full':'');
+    });
   }
   function commit(){
     var entries=results.filter(Boolean);
     for(var k=0;k<entries.length;k++)S.crPhotos.unshift(entries[k]);
-    if(entries.length){
-      var r=aoPersist();
+    var p=entries.length?aoPersistNow():Promise.resolve({ok:true});
+    p.then(function(r){
       if(!r.ok){
         S.crPhotos.splice(0,entries.length);
-        entries.forEach(function(e){if(videoCache[e.id]){URL.revokeObjectURL(videoCache[e.id]);delete videoCache[e.id];}});
+        entries.forEach(function(e){[e.m,e.t,e.v].forEach(function(mid){if(mid)AOStore.removeMedia(mid);});if(videoCache[e.id]){URL.revokeObjectURL(videoCache[e.id]);delete videoCache[e.id];}});
         crSetPhotoMsg(false,r.quota?'Your room is full. Delete a few photos to add more.':'Your memories can\'t be saved here. Open the app in your browser to keep them.',false);
         return;
       }
-    }
-    var msg=entries.length?'Added '+entries.length+(entries.length===1?' memory.':' memories.'):'';
-    if(tooBig)msg+=(msg?' ':'')+(tooBig===1?'One video is over 50 MB, so it wasn\'t added.':tooBig+' videos are over 50 MB, so they weren\'t added.');
-    if(failed)msg+=(msg?' ':'')+(failed===1?'One of those couldn\'t be added. Try a different file.':failed+' of those couldn\'t be added. Try different files.');
-    if((S.scr==='mycorner'||S.scr==='comfort')&&S.myCornerTab==='comfort')S.crSection=0;
-    crSetPhotoMsg(!(failed||tooBig),msg,!(failed||tooBig));
+      var msg=entries.length?'Added '+entries.length+(entries.length===1?' memory.':' memories.'):'';
+      if(tooBig)msg+=(msg?' ':'')+(tooBig===1?'One video is over 50 MB, so it wasn\'t added.':tooBig+' videos are over 50 MB, so they weren\'t added.');
+      if(full)msg+=(msg?' ':'')+'Your room is full. Delete a few photos to add more.';
+      if(failed)msg+=(msg?' ':'')+(failed===1?'One of those couldn\'t be added. Try a different file.':failed+' of those couldn\'t be added. Try different files.');
+      if((S.scr==='mycorner'||S.scr==='comfort')&&S.myCornerTab==='comfort')S.crSection=0;
+      var ok=!(failed||tooBig||full);crSetPhotoMsg(ok,msg,ok);
+    });
   }
   files.forEach(function(file,i){
     try{
+      if(!file||file.error){finish(i,null);return;}
+      var id=Date.now()*10+i;
       if(crIsVideo(file)){
         if(file.size>CR_VIDEO_MAX){finish(i,null,'big');return;}
         var vid=document.createElement('video');
         vid.preload='auto';vid.muted=true;vid.playsInline=true;vid.setAttribute('playsinline','');
         var objUrl=URL.createObjectURL(file);
         vid.src=objUrl;
-        var vidId=Date.now()+i;
         var thumbDone=false;
         var captureThumb=function(){
           if(thumbDone)return;thumbDone=true;
-          var thumbUrl='';
+          var job=Promise.resolve(null);
           try{
             if(vid.videoWidth){
-              var vw=vid.videoWidth,vh=vid.videoHeight||240;
-              var cvs=document.createElement('canvas');
-              cvs.width=Math.min(300,vw);cvs.height=Math.round(cvs.width*vh/Math.max(vw,1));
+              var vw=vid.videoWidth,vh=vid.videoHeight||240,cvs=document.createElement('canvas');
+              cvs.width=Math.min(600,vw);cvs.height=Math.round(cvs.width*vh/Math.max(vw,1));
               cvs.getContext('2d').drawImage(vid,0,0,cvs.width,cvs.height);
-              thumbUrl=cvs.toDataURL('image/jpeg',.72);
+              job=crCanvasBlob(cvs,.8);
             }
           }catch(e){}
-          videoCache[vidId]=objUrl;
-          finish(i,{id:vidId,url:thumbUrl,isVideo:true});
+          job.then(function(tb){
+            videoCache[id]=objUrl;
+            var entry={id:id,isVideo:true,v:'v-'+id,mime:file.type||'video/mp4'},mids=[{id:'v-'+id,blob:file}];
+            if(tb){entry.t='t-'+id;mids.push({id:'t-'+id,blob:tb});}
+            stored(i,entry,mids);
+          });
         };
         vid.onloadeddata=function(){setTimeout(captureThumb,400);};
         vid.onseeked=function(){setTimeout(captureThumb,100);};
-        vid.onerror=function(){if(!thumbDone){thumbDone=true;URL.revokeObjectURL(objUrl);finish(i,{id:vidId,url:'',isVideo:true});}};
+        vid.onerror=function(){if(!thumbDone){thumbDone=true;videoCache[id]=objUrl;stored(i,{id:id,isVideo:true,v:'v-'+id,mime:file.type||'video/mp4'},[{id:'v-'+id,blob:file}]);}};
         /* iOS may never load data for an off-screen video: fall back after 6s rather than hang */
         setTimeout(captureThumb,6000);
         vid.currentTime=0;
         vid.load();
       } else {
-        var reader=new FileReader();
-        reader.onerror=function(){finish(i,null);};
-        reader.onload=function(ev){
-          var rawUrl=ev.target.result;
-          var img=new Image();
-          img.onload=function(){
-            try{
-              var cvs=document.createElement('canvas');
-              var maxW=600,maxH=600,ratio=Math.min(maxW/img.width,maxH/img.height,1);
-              cvs.width=Math.round(img.width*ratio);cvs.height=Math.round(img.height*ratio);
-              cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);
-              finish(i,{id:Date.now()+i,url:cvs.toDataURL('image/jpeg',.72)});
-            }catch(e){
-              finish(i,{id:Date.now()+i,url:rawUrl});
-            }
-          };
-          img.onerror=function(){finish(i,null);}; /* this browser can't read the image: say so instead of saving a broken one */
-          img.src=rawUrl;
+        var src=URL.createObjectURL(file),img=new Image();
+        img.onload=function(){
+          URL.revokeObjectURL(src);
+          try{
+            /* 1200 px on the long edge */
+            var cvs=document.createElement('canvas'),ratio=Math.min(1200/img.width,1200/img.height,1);
+            cvs.width=Math.round(img.width*ratio);cvs.height=Math.round(img.height*ratio);
+            cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);
+            crCanvasBlob(cvs,.82).then(function(b){
+              if(!b){finish(i,null);return;}
+              stored(i,{id:id,m:'img-'+id,w:cvs.width,h:cvs.height},[{id:'img-'+id,blob:b}]);
+            });
+          }catch(e){finish(i,null);}
         };
-        reader.readAsDataURL(file);
+        img.onerror=function(){URL.revokeObjectURL(src);finish(i,null);}; /* this browser can't read the image: say so instead of saving a broken one */
+        img.src=src;
       }
     }catch(err){finish(i,null);}
   });
@@ -2014,9 +2202,9 @@ function drawComfortScrapbook(){
   function polaroid(ph,i){
     var rots=[-6,-2,4,-5,3,-1,5,-4,2,-3];var rot=rots[i%rots.length];
     var isVid=ph.isVideo;
-    var inner=isVid&&!ph.url
+    var inner=isVid&&!ph.url&&!ph.t
       ?'<div style="width:90px;height:90px;background:linear-gradient(135deg,#1a1a2e,#2a2a4a);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px"><div style="font-size:24px">🎬</div><div style="font-size:9px;color:rgba(255,255,255,.6);font-family:\'DM Sans\',sans-serif">video</div></div>'
-      :'<img src="'+ph.url+'" style="width:90px;height:90px;object-fit:cover;display:block" loading="lazy">';
+      :aoImg(aoPhotoThumbId(ph),ph.url,'width:90px;height:90px;object-fit:cover;display:block;background:#efe6d8');
     return '<div data-phview="'+i+'" style="display:inline-block;background:#fff;padding:8px 8px 26px;box-shadow:3px 4px 14px rgba(0,0,0,.2);transform:rotate('+rot+'deg);margin:6px;cursor:pointer;border-radius:2px;position:relative">'+
       inner+
       (isVid?'<div style="position:absolute;top:12px;right:12px;background:rgba(0,0,0,.45);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px">&#9654;</div>':'')+
@@ -2082,7 +2270,7 @@ function drawComfortScrapbook(){
   if(S.crSection===null||S.crSection===undefined){
     /* The cover is a room, not a menu: companion under a lamp at the top, a polaroid and a pinned
        note on the wall (previewing real content), and three objects on a shelf. */
-    var firstPhoto=S.crPhotos.find(function(x){return x.url;});
+    var firstPhoto=S.crPhotos.find(function(x){return x.url||x.m||x.t;});
     var firstAff=S.crAffirmations[0];
     var hr=new Date().getHours();
     var hello=hr<5?'Can\'t sleep? Stay a while.':hr<12?'Morning. Make yourself at home.':hr<17?'Come in. Take a breath.':'Welcome back. Stay as long as you like.';
@@ -2094,7 +2282,7 @@ function drawComfortScrapbook(){
     var polaroidObj='<button class="cr-obj" data-crsec="0" aria-label="Memories" style="transform:rotate(-4deg)">'+
       '<div style="position:relative;background:'+(dark?'#f2eadb':'#fff')+';padding:7px 7px 24px;box-shadow:2px 4px 12px rgba(0,0,0,'+(dark?'.5':'.18')+');border-radius:2px">'+
         '<div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%) rotate(3deg);width:44px;height:15px;background:'+p.wall+';opacity:.75"></div>'+
-        (firstPhoto?'<img src="'+firstPhoto.url+'" alt="" style="width:96px;height:96px;object-fit:cover;display:block">':
+        (firstPhoto?aoImg(aoPhotoThumbId(firstPhoto),firstPhoto.url,'width:96px;height:96px;object-fit:cover;display:block;background:#efe6d8'):
           '<div style="width:96px;height:96px;border:1.5px dashed #c8b8a0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#8a7458"><span style="font-size:26px">&#128248;</span><span style="font-size:11px">add a photo</span></div>')+
         '<span style="position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:#4a3a28">Memories</span>'+
       '</div></button>';
@@ -2222,8 +2410,9 @@ function drawComfortScrapbook(){
       '<div class="serif" style="font-size:13px;font-style:italic;color:var(--t3);text-align:center;padding:30px 20px 10px">The walls are bare for now. Add a photo of someone or somewhere that feels like home.</div>')+
       '<div style="position:relative;margin-top:16px;border-top:1px dashed '+p.bdr+';padding-top:14px">'+
         '<input type="file" id="cr-photo-input" multiple accept="image/*,video/*" style="position:absolute;top:14px;left:0;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0,0,0,0)">'+
-        '<label for="cr-photo-input" id="cr-addphoto" style="display:block;width:100%;padding:12px;text-align:center;border:1.5px dashed '+p.bdr+';border-radius:12px;font-size:13px;cursor:pointer;color:'+p.accent+'">+ Add photos or videos</label>'+
-        '<div style="font-size:11px;color:var(--t3);text-align:center;margin-top:8px">Videos play this session. Thumbnails stay.</div>'+
+        (AOPlatform.media.available()?'<button id="cr-addphoto-native" style="display:block;width:100%;padding:12px;text-align:center;border:1.5px dashed '+p.bdr+';border-radius:12px;font-size:13px;cursor:pointer;color:'+p.accent+';background:none">+ Add photos or videos</button>':'')+
+        '<label for="cr-photo-input" id="cr-addphoto"'+(AOPlatform.media.available()?' hidden':'')+' style="display:block;width:100%;padding:12px;text-align:center;border:1.5px dashed '+p.bdr+';border-radius:12px;font-size:13px;cursor:pointer;color:'+p.accent+'">+ Add photos or videos</label>'+
+        '<div style="font-size:11px;color:var(--t3);text-align:center;margin-top:8px">Videos up to 50 MB. Everything stays on this device.</div>'+
       '</div>'+
     '</div>',
 
@@ -2272,12 +2461,12 @@ function drawComfortScrapbook(){
     /* Page 4 — Voices */
     (function(){
       function voiceCard(v,i){
-        var src=v.data||'';
+        var src=v.m?aoMediaSrc(v.m,v.mime):(v.data||''),has=!!(v.m||v.data);
         return '<div style="background:'+p.card+';border:1px solid '+p.bdr+';border-radius:14px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px">'+
           '<div style="width:40px;height:40px;border-radius:50%;background:'+p.accent+'26;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px">🎙</div>'+
           '<div style="flex:1;min-width:0">'+
             '<div style="font-size:13px;font-weight:600;color:'+p.txt+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(v.label)+'</div>'+
-            (src?'<audio id="va-'+v.id+'" src="'+src+'" controls preload="metadata" style="width:100%;height:28px;margin-top:4px;accent-color:'+p.accent+'"></audio>':
+            (has?'<audio id="va-'+v.id+'" '+(v.m?'data-mid="'+v.m+'" ':'')+'src="'+src+'" controls preload="metadata" style="width:100%;height:28px;margin-top:4px;accent-color:'+p.accent+'"></audio>':
               '<div style="font-size:11px;color:var(--t2);margin-top:3px;line-height:1.45">This recording is no longer available. Delete and re-record, or upload an audio file instead.</div>')+
           '</div>'+
           '<button data-vcdel="'+i+'" aria-label="Delete '+esc(v.label)+'" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:18px;flex-shrink:0">&#215;</button>'+
@@ -2326,21 +2515,30 @@ function drawComfortScrapbook(){
     var idx=parseInt(d.dataset.phview),ph=S.crPhotos[idx];if(!ph)return;
     var ov=document.createElement('div');
     ov.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column';
-    var vidSrc=ph.isVideo&&videoCache[ph.id];
+    var vidSrc=ph.isVideo&&(videoCache[ph.id]||(ph.v&&aoMediaURL[ph.v]));
     var mediaHtml=vidSrc
-      ?'<video src="'+vidSrc+'" controls style="max-width:95%;max-height:72vh;border-radius:8px"></video>'
-      :(ph.url?'<img src="'+ph.url+'" style="max-width:95%;max-height:75vh;border-radius:8px">':'<div style="color:#fff;font-size:13px;padding:20px;text-align:center;opacity:.7">Video not available — delete and re-upload to watch again.</div>');
+      ?'<video src="'+vidSrc+'" controls playsinline style="max-width:95%;max-height:72vh;border-radius:8px"></video>'
+      :(ph.isVideo&&ph.v?'<div id="ph-loading" style="color:#fff;font-size:13px;padding:20px;text-align:center;opacity:.8">Opening your video…</div>'
+      :(!ph.isVideo&&(ph.url||ph.m)?'<img '+(ph.m&&!ph.url?'data-mid="'+ph.m+'" ':'')+'src="'+(ph.url||aoMediaURL[ph.m]||AO_BLANK)+'" style="max-width:95%;max-height:75vh;border-radius:8px">':'<div style="color:#fff;font-size:13px;padding:20px;text-align:center;opacity:.7">Video not available — delete and re-upload to watch again.</div>'));
     ov.innerHTML=mediaHtml+
       '<div style="display:flex;gap:12px;margin-top:16px">'+
         '<button id="ph-close" style="padding:10px 20px;background:rgba(255,255,255,.15);border:none;border-radius:10px;color:#fff;font-size:14px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Close</button>'+
         '<button id="ph-del" style="padding:10px 20px;background:rgba(200,50,50,.85);border:none;border-radius:10px;color:#fff;font-size:14px;cursor:pointer;font-family:\'DM Sans\',sans-serif">Delete '+(ph.isVideo?'video':'photo')+'</button>'+
       '</div>';
     document.body.appendChild(ov);
+    if(!ph.isVideo&&ph.m&&!ph.url)aoMediaLoad(ph.m,'image/jpeg').catch(function(){});
+    if(ph.isVideo&&ph.v&&!vidSrc)aoMediaLoad(ph.v,ph.mime||'video/mp4').then(function(u){var l=ov.querySelector('#ph-loading');if(!l)return;var v=document.createElement('video');v.src=u;v.controls=true;v.setAttribute('playsinline','');v.style.cssText='max-width:95%;max-height:72vh;border-radius:8px';l.replaceWith(v);},function(){var l=ov.querySelector('#ph-loading');if(l)l.textContent='This video couldn\'t be opened.';});
     ov.addEventListener('click',function(e){if(e.target===ov)document.body.removeChild(ov);});
     ov.querySelector('#ph-close').addEventListener('click',function(){document.body.removeChild(ov);});
-    ov.querySelector('#ph-del').addEventListener('click',function(){S.crPhotos.splice(idx,1);saveS();document.body.removeChild(ov);S.crSection=0;drawComfortScrapbook();});
+    ov.querySelector('#ph-del').addEventListener('click',function(){S.crPhotos.splice(idx,1);[ph.m,ph.t,ph.v].forEach(function(mid){if(mid){aoMediaForget(mid);AOStore.removeMedia(mid);}});if(videoCache[ph.id]){URL.revokeObjectURL(videoCache[ph.id]);delete videoCache[ph.id];}saveS();document.body.removeChild(ov);S.crSection=0;drawComfortScrapbook();});
   };});
 
+  var addNat=Q('cr-addphoto-native');
+  if(addNat)addNat.onclick=function(){
+    AOPlatform.media.pick().then(function(list){
+      handleCrFiles(list.map(function(f){if(f.error||!f.blob)return {error:true};try{return new File([f.blob],f.name,{type:f.type});}catch(e){f.blob.name=f.name;return f.blob;}}));
+    },function(){crSetPhotoMsg(false,'Your photos couldn\'t be opened just now. Please try again.',false);});
+  };
   if(S.crAffEditIdx===undefined)S.crAffEditIdx=-1;
   var afftxt=Q('cr-afftxt');if(afftxt){afftxt.value=S.crAffText||'';afftxt.oninput=function(){S.crAffText=afftxt.value;};}
   var affsave=Q('cr-affsave');
@@ -2388,25 +2586,20 @@ function drawComfortScrapbook(){
      Before saving we check the size and that the write really succeeded; if not, the entry is
      rolled back and a clear message is shown — never a silent, unplayable entry. */
   function showVoiceMsg(ok,text){voiceMsg={ok:ok,text:text};if((S.scr==='mycorner'||S.scr==='comfort')&&S.myCornerTab==='comfort'&&S.crSection===4)drawComfortScrapbook();}
-  function persistVoice(dataUrl,label){
-    if(!S.crVoices)S.crVoices=[];
-    var entry={id:Date.now(),label:label||'Voice note',data:dataUrl};
-    S.crVoices.unshift(entry);
-    var json;try{json=aoSerialize();}catch(e){json=null;}
-    var ok=false;
-    if(json&&json.length<=AO_STORE_LIMIT){try{localStorage.setItem('ao_s',json);ok=true;}catch(e){ok=false;}}
-    if(!ok){
-      S.crVoices.shift();
-      showVoiceMsg(false,'There isn\'t enough room on this device to keep that recording. Try a shorter one, or delete an older voice or photo to make space.');
-      return;
-    }
-    showVoiceMsg(true,'Saved “'+entry.label+'”. It\'ll be here whenever you need it.');
-  }
   function saveVoice(blob,label){
-    var reader=new FileReader();
-    reader.onload=function(){persistVoice(reader.result,label);};
-    reader.onerror=function(){showVoiceMsg(false,'That recording couldn\'t be read, so it wasn\'t saved. Please try again.');};
-    reader.readAsDataURL(blob);
+    if(!AOStore.persistent()){showVoiceMsg(false,'Voice notes can\'t be saved here. Open the app in your browser to keep them.');return;}
+    var id=Date.now(),mid='voice-'+id,mime=blob.type||'audio/webm';
+    AOStore.saveMedia(mid,blob).then(function(){
+      if(!S.crVoices)S.crVoices=[];
+      var entry={id:id,label:label||'Voice note',m:mid,mime:mime};
+      S.crVoices.unshift(entry);
+      return aoPersistNow().then(function(r){
+        if(!r.ok){S.crVoices.shift();AOStore.removeMedia(mid);showVoiceMsg(false,r.quota?'There isn\'t enough room on this device to keep that recording. Try a shorter one, or delete an older voice or photo to make space.':'That recording couldn\'t be saved. Please try again.');return;}
+        showVoiceMsg(true,'Saved “'+entry.label+'”. It\'ll be here whenever you need it.');
+      });
+    },function(e){
+      showVoiceMsg(false,AOStore.isQuota(e)?'There isn\'t enough room on this device to keep that recording. Try a shorter one, or delete an older voice or photo to make space.':'That recording couldn\'t be saved. Please try again.');
+    });
   }
   var vcRec=Q('vc-rec');
   if(vcRec)vcRec.onclick=function(){
@@ -2457,6 +2650,7 @@ function drawComfortScrapbook(){
   document.querySelectorAll('[data-vcdel]').forEach(function(b){b.onclick=function(){
     var i=parseInt(b.dataset.vcdel);
     voiceMsg=null;
+    var gone=S.crVoices[i];if(gone&&gone.m){aoMediaForget(gone.m);AOStore.removeMedia(gone.m);}
     S.crVoices.splice(i,1);saveS();S.crSection=4;drawComfortScrapbook();
   };});
 }
@@ -2478,7 +2672,103 @@ function crTickPlant(){
   else{var d=Math.round((new Date(t+'T12:00:00')-new Date(last+'T12:00:00'))/864e5);if(d>=7)S.crPlantStage=Math.max(1,S.crPlantStage-1);else if(d>0)S.crPlantStage=Math.min(5,S.crPlantStage+1);}
   S.crPlantLastSeen=t;saveS();
 }
-loadS();crTickPlant();draw();checkDailyNotif();setInterval(function(){checkDailyNotif();crTickPlant();},60000);
+/* ── STARTUP ──
+   1. app lock (if turned on)  2. open the encrypted store  3. load or migrate data  4. draw
+   5. notifications: listeners, queued actions, reschedule */
+var aoLockOn=false,aoLockedAt=0,aoBgAt=0,aoPendingActions=[],aoDevOffset=0;
+var AO_LOCK_AFTER=60000;
+function aoNow(){return Date.now()+aoDevOffset;}
+function aoBootScreen(html){Q('sw').innerHTML='<div class="shell" id="msh"><div class="ob" style="background:var(--bg);justify-content:center;align-items:center;text-align:center;gap:14px;padding:32px 28px">'+html+'</div></div>';}
+function aoLockScreen(){
+  if(Q('ao-lock'))return;
+  var d=document.createElement('div');d.id='ao-lock';
+  d.style.cssText='position:fixed;inset:0;z-index:10000;background:#fffbf5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px;font-family:\'DM Sans\',sans-serif';
+  d.innerHTML='<div style="font-size:40px">🌿</div><div style="font-family:\'DM Serif Display\',serif;font-style:italic;font-size:26px;color:#2a1c0e">Anxiously Okay</div><div style="font-size:13px;color:#7a6848;text-align:center;max-width:260px;line-height:1.5">Your entries are locked.</div><button id="ao-unlock" style="padding:12px 28px;background:#3a8a4a;color:#e8f8e8;border:none;border-radius:13px;font-size:15px;font-weight:500;cursor:pointer">Unlock</button>';
+  document.body.appendChild(d);
+}
+function aoUnlock(){
+  aoLockScreen();
+  return new Promise(function(resolve){
+    function attempt(){AOPlatform.lock.authenticate('Unlock your entries').then(function(ok){if(ok){var d=Q('ao-lock');if(d)d.remove();resolve();}});}
+    Q('ao-unlock').onclick=attempt;attempt();
+  });
+}
+function aoPrivacyCover(on){
+  var d=Q('ao-privacy');
+  if(on&&!d){d=document.createElement('div');d.id='ao-privacy';d.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(255,251,245,.96);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);display:flex;align-items:center;justify-content:center;font-family:\'DM Serif Display\',serif;font-style:italic;font-size:24px;color:#2a1c0e';d.textContent='Anxiously Okay';document.body.appendChild(d);}
+  if(!on&&d)d.remove();
+}
+/* One-time migration of the old plain-text localStorage copy: encrypt → write → read back and verify
+   → only then delete the plain copy. Photos and voice notes move into their own encrypted files. */
+function aoDataUrlBlob(u){var i=u.indexOf(',');var meta=u.slice(5,i),bin=atob(u.slice(i+1)),a=new Uint8Array(bin.length);for(var k=0;k<bin.length;k++)a[k]=bin.charCodeAt(k);return new Blob([a],{type:meta.split(';')[0]});}
+function aoMigrateLegacy(raw){
+  var data=JSON.parse(raw),media=[];
+  (data.crPhotos||[]).forEach(function(ph){
+    if(typeof ph.url==='string'&&ph.url.indexOf('data:')===0){var mid=(ph.isVideo?'t-':'img-')+ph.id;media.push({id:mid,blob:aoDataUrlBlob(ph.url)});if(ph.isVideo)ph.t=mid;else ph.m=mid;delete ph.url;}
+    delete ph.videoUrl;
+  });
+  (data.crVoices||[]).forEach(function(v){
+    if(typeof v.data==='string'&&v.data.indexOf('data:')===0){var b=aoDataUrlBlob(v.data);v.m='voice-'+v.id;v.mime=b.type;media.push({id:v.m,blob:b});delete v.data;}
+  });
+  return media.reduce(function(p,x){return p.then(function(){return AOStore.saveMedia(x.id,x.blob);});},Promise.resolve())
+    .then(function(){return AOStore.writeState(data);})
+    .then(function(){return AOStore.readState();})
+    .then(function(back){
+      if(!back||JSON.stringify(back.data)!==JSON.stringify(data))throw new Error('verify-state');
+      return Promise.all(media.map(function(x){return AOStore.loadMedia(x.id).then(function(b){if(b.size!==x.blob.size)throw new Error('verify-media');});}));
+    })
+    .then(function(){try{localStorage.removeItem('ao_s');}catch(e){}return data;});
+}
+function aoLoadState(){
+  var legacy=null;try{legacy=localStorage.getItem('ao_s');}catch(e){}
+  return AOStore.readState().then(function(st){
+    if(st&&st.data){
+      /* an earlier migration finished writing but stopped before deleting the plain copy */
+      if(legacy){try{localStorage.removeItem('ao_s');}catch(e){}}
+      return st.data;
+    }
+    if(legacy&&AOStore.persistent())return aoMigrateLegacy(legacy).catch(function(){return JSON.parse(legacy);}); /* verification failed: keep the plain copy, retry next launch */
+    if(legacy)return JSON.parse(legacy);
+    return null;
+  });
+}
+function aoBoot(){
+  aoBootScreen('');
+  var lockPref=AOPlatform.isNative()?AOPlatform.storage.get('lock'):Promise.resolve(null);
+  return lockPref.then(function(v){aoLockOn=v==='1';AOPlatform.hideSplash();return aoLockOn?aoUnlock():null;})
+    .then(function(){return AOStore.init();})
+    .then(function(){return aoLoadState();})
+    .then(function(data){
+      aoApplyLoaded(data);aoReady=true;
+      crTickPlant();draw();AOPlatform.hideSplash();AOPlatform.statusBar(dark);
+      if(!AOStore.persistent())setTimeout(function(){aoToast('This browser can\'t keep your entries, so they\'ll be gone when you close this page.');},800);
+      aoNotifStart();
+      setInterval(crTickPlant,60000);
+      if(window.AO_BUILD&&AO_BUILD.devtools){var sc=document.createElement('script');sc.src='js/devtools.js';document.body.appendChild(sc);}
+    },function(e){
+      AOPlatform.hideSplash();
+      if(e&&(e.code==='key-missing'||e.code==='unreadable')){
+        aoBootScreen('<div style="font-size:36px">🌿</div><div class="serif" style="font-size:22px;font-style:italic;color:var(--text)">Your entries can\'t be opened</div><div style="font-size:13px;color:var(--t2);line-height:1.6;max-width:280px">The key that protects them isn\'t on this device any more, so they can\'t be read. Nothing has been changed. You can start fresh, which clears what\'s stored here.</div><button class="btn" id="ao-fresh" style="max-width:260px">Start fresh</button>');
+        Q('ao-fresh').onclick=function(){aoDeleteEverything();};
+      } else {
+        aoBootScreen('<div style="font-size:36px">🌿</div><div style="font-size:14px;color:var(--t2);line-height:1.6;max-width:280px">Something stopped your entries from opening. Close the app and open it again.</div>');
+      }
+    });
+}
+AOPlatform.onPause(function(){
+  if(!aoReady)return;
+  aoBgAt=Date.now();
+  aoPrivacyCover(true);
+  AOStore.flush();
+  aoReschedule();
+});
+AOPlatform.onResume(function(){
+  if(!aoReady){aoPrivacyCover(false);return;}
+  var away=aoBgAt?Date.now()-aoBgAt:0;aoBgAt=0;
+  var p=(aoLockOn&&away>AO_LOCK_AFTER)?aoUnlock():Promise.resolve();
+  p.then(function(){aoPrivacyCover(false);crTickPlant();aoReschedule();aoDrainActions();});
+});
+aoBoot();
 </script>
 </body>
 </html>

@@ -1,0 +1,44 @@
+{
+  "name": "anxiously-okay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Anxiously Okay — a private, on-device companion for anxious days.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "node scripts/build.mjs --flavor=release",
+    "build:release": "node scripts/build.mjs --flavor=release",
+    "build:beta": "node scripts/build.mjs --flavor=beta",
+    "build:dev": "node scripts/build.mjs --flavor=dev",
+    "sync": "npm run build:release && npx cap sync",
+    "sync:dev": "npm run build:dev && AO_FLAVOR=dev npx cap sync",
+    "assets": "npx capacitor-assets generate --pwaManifestPath www/manifest.json --iconBackgroundColor '#fffbf5' --iconBackgroundColorDark '#1a1208' --splashBackgroundColor '#fffbf5' --splashBackgroundColorDark '#1a1208'",
+    "test": "node --test test/*.test.js",
+    "serve": "npx http-server www -p 8080 -c-1"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@aparajita/capacitor-biometric-auth": "^10.0.0",
+    "@aparajita/capacitor-secure-storage": "^8.0.1",
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/camera": "^8.2.6",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.6.0",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/share": "^8.0.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
+    "@capawesome/capacitor-file-picker": "^8.1.1"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.6.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}
