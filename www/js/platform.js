@@ -315,14 +315,18 @@
   };
 
   /* ---------- lifecycle ---------- */
-  var pauseCbs = [], resumeCbs = [];
-  function firePause() { pauseCbs.forEach(function (f) { try { f(); } catch (e) {} }); }
-  function fireResume() { resumeCbs.forEach(function (f) { try { f(); } catch (e) {} }); }
+  /* Pause/resume fire only on a real change of state, and every way of leaving has a way back:
+     a page restored with only 'pageshow' (Safari's back-forward cache / app switcher) used to stay
+     paused — our effects stopped and the privacy cover stayed up until something redrew. */
+  var pauseCbs = [], resumeCbs = [], paused = false;
+  function firePause() { if (paused) return; paused = true; pauseCbs.forEach(function (f) { try { f(); } catch (e) {} }); }
+  function fireResume() { if (!paused) return; paused = false; resumeCbs.forEach(function (f) { try { f(); } catch (e) {} }); }
   if (native) {
     C.App.addListener('appStateChange', function (s) { if (s.isActive) fireResume(); else firePause(); });
   } else {
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') firePause(); else fireResume(); });
     window.addEventListener('pagehide', firePause);
+    window.addEventListener('pageshow', function () { if (document.visibilityState !== 'hidden') fireResume(); });
   }
 
   window.AOPlatform = {
